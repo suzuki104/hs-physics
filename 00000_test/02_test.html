@@ -1,0 +1,1046 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>落下運動の軌跡解析</title>
+  <style>
+    :root {
+      --bg-1: #020817;
+      --bg-2: #0f172a;
+      --panel: rgba(15, 23, 42, 0.88);
+      --panel-2: rgba(30, 41, 59, 0.9);
+      --line: rgba(148, 163, 184, 0.4);
+      --text: #e2e8f0;
+      --muted: #cbd5e1;
+      --accent: #22d3ee;
+      --accent-2: #a78bfa;
+      --ball: #fbbf24;
+      --graph-x: #60a5fa;
+      --graph-y: #f59e0b;
+      --danger: #f87171;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: "Segoe UI", "Hiragino Sans", "Yu Gothic", sans-serif;
+      background:
+        radial-gradient(circle at top, rgba(34, 211, 238, 0.15), transparent 30%),
+        radial-gradient(circle at bottom right, rgba(167, 139, 250, 0.15), transparent 24%),
+        linear-gradient(180deg, var(--bg-1), var(--bg-2));
+      color: var(--text);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 24px;
+    }
+
+    .app {
+      width: min(1200px, 100%);
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 20px;
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.35);
+      overflow: hidden;
+    }
+
+    .header {
+      padding: 26px 28px 18px;
+      border-bottom: 1px solid var(--line);
+      background: rgba(15, 23, 42, 0.76);
+    }
+
+    h1 {
+      margin: 0 0 10px;
+      font-size: clamp(1.5rem, 2.4vw, 2.6rem);
+      line-height: 1.2;
+    }
+
+    .subtitle {
+      margin: 0;
+      color: var(--muted);
+      font-size: 0.98rem;
+      line-height: 1.6;
+    }
+
+    .body {
+      display: grid;
+      grid-template-columns: 1.5fr 0.9fr;
+      gap: 22px;
+      padding: 22px;
+    }
+
+    .stage-card,
+    .control-card,
+    .graph-card {
+      background: var(--panel-2);
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      padding: 18px;
+    }
+
+    .video-wrap {
+      position: relative;
+      width: 100%;
+      aspect-ratio: 16 / 9;
+      border-radius: 14px;
+      overflow: hidden;
+      background: #000;
+      border: 1px solid var(--line);
+    }
+
+    canvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+      background: #000;
+      border-radius: 12px;
+    }
+
+    .stage-hint {
+      position: absolute;
+      left: 12px;
+      bottom: 12px;
+      background: rgba(15, 23, 42, 0.75);
+      color: var(--text);
+      border: 1px solid rgba(148,163,184,0.35);
+      border-radius: 999px;
+      padding: 8px 12px;
+      font-size: 0.8rem;
+      pointer-events: none;
+    }
+
+    .control-card {
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+    }
+
+    .control-group {
+      display: grid;
+      gap: 8px;
+    }
+
+    .label-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      color: var(--muted);
+      font-size: 0.95rem;
+    }
+
+    .value {
+      color: var(--text);
+      font-weight: 700;
+      min-width: 60px;
+      text-align: right;
+    }
+
+    .num-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+
+    label {
+      display: grid;
+      gap: 6px;
+      color: var(--muted);
+      font-size: 0.9rem;
+    }
+
+    input[type="number"],
+    input[type="range"] {
+      width: 100%;
+    }
+
+    input[type="number"] {
+      padding: 9px 10px;
+      border: 1px solid rgba(148,163,184,0.35);
+      border-radius: 10px;
+      background: rgba(15,23,42,0.8);
+      color: var(--text);
+    }
+
+    input[type="range"] {
+      accent-color: var(--accent);
+    }
+
+    .buttons {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+
+    button,
+    .file-button {
+      appearance: none;
+      border: none;
+      border-radius: 12px;
+      padding: 12px 14px;
+      cursor: pointer;
+      font-size: 0.95rem;
+      font-weight: 700;
+      transition: transform 0.15s ease, filter 0.15s ease;
+    }
+
+    button:hover,
+    .file-button:hover {
+      transform: translateY(-1px);
+      filter: brightness(1.04);
+    }
+
+    .primary {
+      background: linear-gradient(135deg, var(--accent), var(--accent-2));
+      color: #03111e;
+    }
+
+    .secondary {
+      background: rgba(148, 163, 184, 0.15);
+      color: var(--text);
+      border: 1px solid rgba(148, 163, 184, 0.3);
+    }
+
+    .file-button {
+      display: inline-block;
+      text-align: center;
+      background: rgba(59, 130, 246, 0.12);
+      color: var(--text);
+      border: 1px solid rgba(96,165,250,0.32);
+    }
+
+    input[type="file"] {
+      display: none;
+    }
+
+    .graphs {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 18px;
+      padding: 0 22px 22px;
+    }
+
+    .graph-card h3 {
+      margin: 0 0 12px;
+      font-size: 1rem;
+      color: var(--text);
+    }
+
+    .graph-card canvas {
+      height: 220px;
+      background: rgba(2, 6, 23, 0.78);
+      border: 1px solid rgba(148, 163, 184, 0.25);
+    }
+
+    .info-box {
+      border-top: 1px solid var(--line);
+      padding-top: 18px;
+      color: var(--muted);
+      line-height: 1.7;
+      font-size: 0.95rem;
+    }
+
+    .info-box strong {
+      color: var(--text);
+    }
+
+    @media (max-width: 900px) {
+      .body,
+      .graphs {
+        grid-template-columns: 1fr;
+      }
+
+      .buttons,
+      .num-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header class="header">
+      <h1>落下運動の軌跡解析</h1>
+      <p class="subtitle">
+        動画を取り込んで、ボールの初期位置を設定し、水平・鉛直方向の運動をグラフで確認できます。<br>
+        物理の授業で、位置の変化を時間とともに視覚的に説明するための教材として使えます。
+      </p>
+    </header>
+
+    <main class="body">
+      <section class="stage-card">
+        <div class="video-wrap">
+          <canvas id="stage" width="1280" height="720"></canvas>
+          <div class="stage-hint">動画を選択して、ボールの初期位置をクリックしてください</div>
+        </div>
+      </section>
+
+      <aside class="control-card">
+        <div class="control-group">
+          <div class="label-row">
+            <span>動画ファイル</span>
+          </div>
+          <label class="file-button" for="videoFile">動画を選択</label>
+          <input id="videoFile" type="file" accept="video/*" />
+        </div>
+
+        <div class="control-group">
+          <div class="label-row">
+            <span>初期位置</span>
+            <span class="value" id="posValue">X: 200, Y: 120</span>
+          </div>
+          <div class="num-grid">
+            <label>
+              X
+              <input id="initX" type="number" step="1" value="200" />
+            </label>
+            <label>
+              Y
+              <input id="initY" type="number" step="1" value="120" />
+            </label>
+          </div>
+        </div>
+
+        <div class="control-group">
+          <div class="label-row">
+            <span>再生速度</span>
+            <span class="value" id="speedValue">1.0x</span>
+          </div>
+          <input id="playbackRate" type="range" min="0.25" max="2" step="0.25" value="1" />
+        </div>
+
+        <div class="buttons">
+          <button class="primary" id="xCalibBtn" disabled>x軸の基準を作成</button>
+          <button class="secondary" id="yCalibBtn" disabled>y軸の基準を作成</button>
+        </div>
+
+        <div class="control-group">
+          <div class="label-row">
+            <span>グラフの表示時間</span>
+            <span class="value" id="xRangeValue">0.0〜2.0 s</span>
+          </div>
+          <div class="buttons">
+            <button class="secondary" id="timeMinDownBtn">-0.1</button>
+            <button class="secondary" id="setTimeMinBtn">開始時刻を設定</button>
+            <button class="secondary" id="timeMinUpBtn">+0.1</button>
+          </div>
+          <div class="buttons">
+            <button class="secondary" id="timeMaxDownBtn">-0.1</button>
+            <button class="secondary" id="setTimeMaxBtn">終了時刻を設定</button>
+            <button class="secondary" id="timeMaxUpBtn">+0.1</button>
+          </div>
+        </div>
+
+        <div class="buttons">
+          <button class="primary" id="updateBtn">トラッキング更新</button>
+          <button class="secondary" id="playBtn" disabled>再生</button>
+          <button class="secondary" id="resetBtn">リセット</button>
+        </div>
+
+        <div class="info-box">
+          <strong>使い方:</strong><br />
+          1. 動画をアップロードする<br />
+          2. 画面上でボールをクリックして、初期位置と色を設定する<br />
+          3. 再生すると、その色を基準にボール位置を自動追跡する<br />
+          4. 水平方向と鉛直方向のグラフで運動を比較する
+        </div>
+      </aside>
+    </main>
+
+    <section class="graphs">
+      <div class="graph-card">
+        <h3>水平方向 x-t グラフ</h3>
+        <canvas id="graphX" width="520" height="220"></canvas>
+      </div>
+      <div class="graph-card">
+        <h3>鉛直方向 y-t グラフ</h3>
+        <canvas id="graphY" width="520" height="220"></canvas>
+      </div>
+    </section>
+  </div>
+
+  <video id="video" playsinline muted crossorigin="anonymous" preload="auto" style="display:none"></video>
+
+  <script>
+    const canvas = document.getElementById('stage');
+    const ctx = canvas.getContext('2d');
+    const video = document.getElementById('video');
+    const fileInput = document.getElementById('videoFile');
+    const playBtn = document.getElementById('playBtn');
+    const updateBtn = document.getElementById('updateBtn');
+    const resetBtn = document.getElementById('resetBtn');
+    const xCalibBtn = document.getElementById('xCalibBtn');
+    const yCalibBtn = document.getElementById('yCalibBtn');
+    const initXInput = document.getElementById('initX');
+    const initYInput = document.getElementById('initY');
+    const playbackRateInput = document.getElementById('playbackRate');
+    const speedValue = document.getElementById('speedValue');
+    const timeMinDownBtn = document.getElementById('timeMinDownBtn');
+    const setTimeMinBtn = document.getElementById('setTimeMinBtn');
+    const timeMinUpBtn = document.getElementById('timeMinUpBtn');
+    const timeMaxDownBtn = document.getElementById('timeMaxDownBtn');
+    const setTimeMaxBtn = document.getElementById('setTimeMaxBtn');
+    const timeMaxUpBtn = document.getElementById('timeMaxUpBtn');
+    const xRangeValue = document.getElementById('xRangeValue');
+    const graphX = document.getElementById('graphX');
+    const graphY = document.getElementById('graphY');
+    const graphXCtx = graphX.getContext('2d');
+    const graphYCtx = graphY.getContext('2d');
+    const posValue = document.getElementById('posValue');
+    const stageHint = document.querySelector('.stage-hint');
+
+    const offscreen = document.createElement('canvas');
+    const offscreenCtx = offscreen.getContext('2d');
+
+    const state = {
+      videoLoaded: false,
+      isPlaying: false,
+      refColor: null,
+      currentBall: null,
+      trackedPoints: [],
+      lastTrackedTime: 0,
+      lastPosition: null,
+      initialX: Number(initXInput.value),
+      initialY: Number(initYInput.value),
+      xScaleCmPerPixel: null,
+      yScaleCmPerPixel: null,
+      xCalibrationLine: null,
+      yCalibrationLine: null,
+      calibratingAxis: null,
+      calibrationStart: null,
+      calibrationEnd: null,
+      calibrationPreviewEnd: null
+    };
+
+    function updateReadouts() {
+      state.initialX = Number(initXInput.value);
+      state.initialY = Number(initYInput.value);
+      posValue.textContent = `X: ${state.initialX}, Y: ${state.initialY}`;
+    }
+
+    function getVideoRect() {
+      if (!video.videoWidth || !video.videoHeight) {
+        return { x: 0, y: 0, width: canvas.width, height: canvas.height, scale: 1 };
+      }
+
+      const vw = video.videoWidth;
+      const vh = video.videoHeight;
+      const scale = Math.min(canvas.width / vw, canvas.height / vh);
+      const width = vw * scale;
+      const height = vh * scale;
+      const x = (canvas.width - width) / 2;
+      const y = (canvas.height - height) / 2;
+      return { x, y, width, height, scale };
+    }
+
+    function drawVideoFrame() {
+      if (!video || !video.videoWidth || !video.videoHeight) return;
+      const rect = getVideoRect();
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(video, rect.x, rect.y, rect.width, rect.height);
+    }
+
+    function videoToCanvas(xVideo, yVideo) {
+      const rect = getVideoRect();
+      return {
+        x: rect.x + xVideo * rect.scale,
+        y: rect.y + yVideo * rect.scale
+      };
+    }
+
+    function drawBallAt(xVideo, yVideo, color = '#fbbf24', alpha = 1) {
+      const p = videoToCanvas(xVideo, yVideo);
+      ctx.beginPath();
+      ctx.fillStyle = color;
+      ctx.globalAlpha = alpha;
+      ctx.arc(p.x, p.y, 12, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.globalAlpha = 1;
+
+      ctx.beginPath();
+      ctx.fillStyle = 'rgba(255,255,255,0.42)';
+      ctx.arc(p.x - 4, p.y - 4, 4, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    function sampleAverageColor(imageData, x, y, radius = 6) {
+      let r = 0, g = 0, b = 0, count = 0;
+      for (let yy = Math.max(0, y - radius); yy <= Math.min(imageData.height - 1, y + radius); yy++) {
+        for (let xx = Math.max(0, x - radius); xx <= Math.min(imageData.width - 1, x + radius); xx++) {
+          const i = (yy * imageData.width + xx) * 4;
+          r += imageData.data[i];
+          g += imageData.data[i + 1];
+          b += imageData.data[i + 2];
+          count++;
+        }
+      }
+      if (!count) return { r: 0, g: 0, b: 0 };
+      return { r: r / count, g: g / count, b: b / count };
+    }
+
+    function setReferenceColorFromVideoPoint(xVideo, yVideo) {
+      if (!video.videoWidth || !video.videoHeight) return;
+      offscreen.width = video.videoWidth;
+      offscreen.height = video.videoHeight;
+      offscreenCtx.drawImage(video, 0, 0, offscreen.width, offscreen.height);
+      const imageData = offscreenCtx.getImageData(
+        Math.max(0, xVideo - 10),
+        Math.max(0, yVideo - 10),
+        Math.min(offscreen.width - Math.max(0, xVideo - 10), 21),
+        Math.min(offscreen.height - Math.max(0, yVideo - 10), 21)
+      );
+      state.refColor = sampleAverageColor(imageData, Math.min(10, imageData.width - 1), Math.min(10, imageData.height - 1), 4);
+      state.currentBall = { x: xVideo, y: yVideo };
+      state.trackedPoints = [{ x: xVideo, y: yVideo, t: video.currentTime || 0 }];
+      state.lastTrackedTime = video.currentTime || 0;
+      state.lastPosition = { x: xVideo, y: yVideo };
+    }
+
+    function findTrackedBall() {
+      if (!state.refColor || !video.videoWidth || !video.videoHeight) return null;
+
+      offscreen.width = video.videoWidth;
+      offscreen.height = video.videoHeight;
+      offscreenCtx.drawImage(video, 0, 0, offscreen.width, offscreen.height);
+      const imageData = offscreenCtx.getImageData(0, 0, offscreen.width, offscreen.height);
+      const prev = state.lastPosition || { x: state.initialX, y: state.initialY };
+
+      let best = null;
+      let bestDistance = Infinity;
+      const searchRadius = 120;
+      const xStart = Math.max(0, Math.round(prev.x - searchRadius));
+      const xEnd = Math.min(imageData.width - 1, Math.round(prev.x + searchRadius));
+      const yStart = Math.max(0, Math.round(prev.y - searchRadius));
+      const yEnd = Math.min(imageData.height - 1, Math.round(prev.y + searchRadius));
+
+      for (let y = yStart; y <= yEnd; y += 2) {
+        for (let x = xStart; x <= xEnd; x += 2) {
+          const idx = (y * imageData.width + x) * 4;
+          const r = imageData.data[idx];
+          const g = imageData.data[idx + 1];
+          const b = imageData.data[idx + 2];
+          const dist = Math.sqrt((r - state.refColor.r) ** 2 + (g - state.refColor.g) ** 2 + (b - state.refColor.b) ** 2);
+          if (dist < 90 && dist < bestDistance) {
+            bestDistance = dist;
+            best = { x, y, dist };
+          }
+        }
+      }
+
+      if (!best) return null;
+
+      const dx = Math.abs(best.x - prev.x);
+      const dy = Math.abs(best.y - prev.y);
+      if (dx > 250 || dy > 250) return null;
+
+      return { x: best.x, y: best.y };
+    }
+
+    let rangeStartTime = 0;
+    let rangeEndTime = 2;
+
+    function updateTimeRangeFromData() {
+      const maxTime = state.trackedPoints.length ? Math.max(...state.trackedPoints.map(p => p.t), 2) : 2;
+      let start = rangeStartTime;
+      let end = rangeEndTime;
+      if (start > end) [start, end] = [end, start];
+      if (end <= start) end = start + 0.1;
+      if (end > maxTime + 0.5) end = maxTime;
+      if (start < 0) start = 0;
+      rangeStartTime = start;
+      rangeEndTime = end;
+      xRangeValue.textContent = `${start.toFixed(1)}〜${end.toFixed(1)} s`;
+      return { start, end };
+    }
+
+    function drawGraph(canvasCtx, points, mode) {
+      const w = canvasCtx.canvas.width;
+      const h = canvasCtx.canvas.height;
+      const padding = 30;
+      canvasCtx.clearRect(0, 0, w, h);
+      canvasCtx.fillStyle = 'rgba(2, 6, 23, 0.8)';
+      canvasCtx.fillRect(0, 0, w, h);
+
+      const visible = { start: rangeStartTime, end: rangeEndTime };
+      if (visible.end <= visible.start) visible.end = visible.start + 0.1;
+
+      const inRange = points.filter(p => p.t >= visible.start && p.t <= visible.end);
+      if (!inRange.length) return;
+
+      const scale = mode === 'x' ? state.xScaleCmPerPixel : state.yScaleCmPerPixel;
+      const values = inRange.map(p => {
+        let raw = mode === 'x' ? p.x : p.y;
+        if (mode === 'x') raw -= state.initialX;
+        else raw -= state.initialY;
+        if (scale) raw *= scale;
+        return raw;
+      });
+      const minVal = Math.min(...values);
+      const maxVal = Math.max(...values);
+      const xMin = visible.start;
+      const xMax = visible.end;
+
+      const toX = (t) => padding + ((t - xMin) / (xMax - xMin || 1)) * (w - padding * 2);
+      const toY = (v) => h - padding - ((v - minVal) / (Math.max(maxVal - minVal, 1))) * (h - padding * 2);
+
+      canvasCtx.strokeStyle = 'rgba(148,163,184,0.5)';
+      canvasCtx.lineWidth = 1;
+      for (let i = 0; i <= 5; i++) {
+        const x = padding + (i / 5) * (w - padding * 2);
+        canvasCtx.beginPath();
+        canvasCtx.moveTo(x, padding);
+        canvasCtx.lineTo(x, h - padding);
+        canvasCtx.stroke();
+
+        const tickValue = xMin + ((xMax - xMin) * i) / 5;
+        canvasCtx.fillStyle = '#cbd5e1';
+        canvasCtx.font = '11px sans-serif';
+        canvasCtx.fillText(tickValue.toFixed(1) + 's', x - 12, h - 10);
+      }
+
+      for (let i = 0; i <= 5; i++) {
+        const y = padding + (i / 5) * (h - padding * 2);
+        canvasCtx.beginPath();
+        canvasCtx.moveTo(padding, y);
+        canvasCtx.lineTo(w - padding, y);
+        canvasCtx.stroke();
+
+        const v = minVal + ((maxVal - minVal) * (5 - i)) / 5;
+        canvasCtx.fillStyle = '#cbd5e1';
+        canvasCtx.font = '11px sans-serif';
+        canvasCtx.fillText((v).toFixed(1), 6, y + 4);
+      }
+
+      canvasCtx.strokeStyle = mode === 'x' ? '#60a5fa' : '#f59e0b';
+      canvasCtx.lineWidth = 2.5;
+      canvasCtx.beginPath();
+      inRange.forEach((point, index) => {
+        const x = toX(point.t);
+        let v = mode === 'x' ? point.x : point.y;
+        if (mode === 'x') v -= state.initialX;
+        else v -= state.initialY;
+        if (scale) v *= scale;
+        const y = toY(v);
+        if (index === 0) canvasCtx.moveTo(x, y);
+        else canvasCtx.lineTo(x, y);
+      });
+      canvasCtx.stroke();
+
+      canvasCtx.strokeStyle = 'rgba(226,232,240,0.9)';
+      canvasCtx.beginPath();
+      canvasCtx.moveTo(padding, h - padding);
+      canvasCtx.lineTo(w - padding, h - padding);
+      canvasCtx.moveTo(padding, h - padding);
+      canvasCtx.lineTo(padding, padding);
+      canvasCtx.stroke();
+
+      canvasCtx.fillStyle = '#e2e8f0';
+      canvasCtx.font = '12px sans-serif';
+      canvasCtx.fillText('t [s]', w - 42, h - 8);
+      canvasCtx.fillText(mode === 'x' ? (state.xScaleCmPerPixel ? 'x [cm]' : 'x [px]') : (state.yScaleCmPerPixel ? 'y [cm]' : 'y [px]'), 8, 16);
+    }
+
+    function updateGraphs() {
+      const { start, end } = updateTimeRangeFromData();
+      xRangeValue.textContent = `${start.toFixed(1)}〜${end.toFixed(1)} s`;
+      if (!state.trackedPoints.length) return;
+      drawGraph(graphXCtx, state.trackedPoints, 'x');
+      drawGraph(graphYCtx, state.trackedPoints, 'y');
+    }
+
+    function drawCalibrationLines() {
+      const lineList = [];
+      if (state.xCalibrationLine) lineList.push({ line: state.xCalibrationLine, color: '#60a5fa', label: `x: ${state.xCalibrationLine.cm}cm` });
+      if (state.yCalibrationLine) lineList.push({ line: state.yCalibrationLine, color: '#f59e0b', label: `y: ${state.yCalibrationLine.cm}cm` });
+      if (state.calibratingAxis && state.calibrationStart && state.calibrationPreviewEnd) {
+        lineList.push({
+          line: { start: state.calibrationStart, end: state.calibrationPreviewEnd },
+          color: state.calibratingAxis === 'x' ? '#60a5fa' : '#f59e0b',
+          label: state.calibratingAxis === 'x' ? 'x基準' : 'y基準'
+        });
+      }
+
+      lineList.forEach(({ line, color, label }) => {
+        ctx.save();
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 2;
+        ctx.setLineDash([8, 6]);
+        ctx.beginPath();
+        ctx.moveTo(line.start.x, line.start.y);
+        ctx.lineTo(line.end.x, line.end.y);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.fillStyle = color;
+        ctx.font = '12px sans-serif';
+        const mx = (line.start.x + line.end.x) / 2;
+        const my = (line.start.y + line.end.y) / 2;
+        if (label) ctx.fillText(label, mx + 10, my - 8);
+        ctx.restore();
+      });
+    }
+
+    function applyAxisCalibration(axis, cm, pxLength) {
+      if (pxLength <= 0) return;
+      const scale = cm / pxLength;
+      if (axis === 'x') {
+        state.xScaleCmPerPixel = scale;
+        state.xCalibrationLine = {
+          start: state.calibrationStart,
+          end: state.calibrationEnd,
+          cm
+        };
+        xCalibBtn.disabled = true;
+        yCalibBtn.disabled = false;
+      } else {
+        state.yScaleCmPerPixel = scale;
+        state.yCalibrationLine = {
+          start: state.calibrationStart,
+          end: state.calibrationEnd,
+          cm
+        };
+        yCalibBtn.disabled = true;
+        playBtn.disabled = false;
+      }
+      stageHint.textContent = '動画を選択して、ボールの初期位置をクリックしてください';
+      state.calibratingAxis = null;
+      state.calibrationStart = null;
+      state.calibrationEnd = null;
+      state.calibrationPreviewEnd = null;
+    }
+
+    function beginAxisCalibration(axis) {
+      state.calibratingAxis = axis;
+      state.calibrationStart = null;
+      state.calibrationEnd = null;
+      state.calibrationPreviewEnd = null;
+      stageHint.textContent = axis === 'x'
+        ? 'x軸の基準を引いてください。1回目が始点、2回目で確定します。'
+        : 'y軸の基準を引いてください。1回目が始点、2回目で確定します。';
+    }
+
+    function updateCalibrationPreview(event) {
+      if (!state.calibratingAxis || !state.calibrationStart) return;
+      state.calibrationPreviewEnd = getCanvasPosition(event);
+    }
+
+    function getCanvasPosition(event) {
+      const rect = canvas.getBoundingClientRect();
+      return {
+        x: (event.clientX - rect.left) * (canvas.width / rect.width),
+        y: (event.clientY - rect.top) * (canvas.height / rect.height)
+      };
+    }
+
+    function render() {
+      if (video.readyState >= 2) {
+        drawVideoFrame();
+        drawCalibrationLines();
+
+        if (state.refColor && !video.paused) {
+          const found = findTrackedBall();
+          if (found) {
+            state.currentBall = found;
+            state.lastPosition = found;
+            const t = video.currentTime || 0;
+            if (!state.trackedPoints.length || Math.abs(t - state.lastTrackedTime) > 0.03) {
+              state.trackedPoints.push({ x: found.x, y: found.y, t });
+              state.lastTrackedTime = t;
+            }
+          }
+        }
+
+        if (state.currentBall) {
+          drawBallAt(state.currentBall.x, state.currentBall.y, '#fbbf24', 1);
+        }
+
+        updateGraphs();
+      }
+
+      requestAnimationFrame(render);
+    }
+
+    function updatePlaybackRate() {
+      const value = Number(playbackRateInput.value);
+      video.playbackRate = value;
+      speedValue.textContent = `${value.toFixed(2).replace(/\.00$/, '.0').replace(/0$/, '')}x`;
+    }
+
+    function refreshReferenceFromInitialPosition() {
+      if (!video.videoWidth || !video.videoHeight) return;
+      const x = Number(initXInput.value);
+      const y = Number(initYInput.value);
+      state.initialX = Math.max(0, Math.min(video.videoWidth, x));
+      state.initialY = Math.max(0, Math.min(video.videoHeight, y));
+      state.lastPosition = { x: state.initialX, y: state.initialY };
+
+      offscreen.width = video.videoWidth;
+      offscreen.height = video.videoHeight;
+      offscreenCtx.drawImage(video, 0, 0, offscreen.width, offscreen.height);
+      const sampleX = Math.max(0, Math.min(offscreen.width - 1, state.initialX));
+      const sampleY = Math.max(0, Math.min(offscreen.height - 1, state.initialY));
+      const imageData = offscreenCtx.getImageData(
+        Math.max(0, sampleX - 12),
+        Math.max(0, sampleY - 12),
+        Math.min(offscreen.width - Math.max(0, sampleX - 12), 25),
+        Math.min(offscreen.height - Math.max(0, sampleY - 12), 25)
+      );
+      state.refColor = sampleAverageColor(imageData, Math.min(12, imageData.width - 1), Math.min(12, imageData.height - 1), 5);
+      state.currentBall = { x: state.initialX, y: state.initialY };
+    }
+
+    function resetToInitialState() {
+      if (!video.src) return;
+      if (video.readyState >= 2) {
+        video.pause();
+        video.currentTime = 0;
+      }
+
+      state.isPlaying = false;
+      playBtn.textContent = '再生';
+      updateReadouts();
+      state.trackedPoints = [{ x: state.initialX, y: state.initialY, t: 0 }];
+      state.lastTrackedTime = 0;
+      state.lastPosition = { x: state.initialX, y: state.initialY };
+      state.currentBall = { x: state.initialX, y: state.initialY };
+      refreshReferenceFromInitialPosition();
+      rangeStartTime = 0;
+      rangeEndTime = 2;
+      xRangeValue.textContent = '0.0〜2.0 s';
+      renderMotion();
+    }
+
+    function adjustTimeRange(kind, delta) {
+      const maxTime = state.trackedPoints.length ? Math.max(...state.trackedPoints.map(p => p.t), 2) : 2;
+      if (kind === 'start') {
+        rangeStartTime = Math.max(0, Math.min(rangeStartTime + delta, rangeEndTime - 0.1));
+      } else {
+        rangeEndTime = Math.max(rangeStartTime + 0.1, Math.min(rangeEndTime + delta, maxTime));
+      }
+      updateGraphs();
+    }
+
+    function promptTimeRange(kind) {
+      const maxTime = state.trackedPoints.length ? Math.max(...state.trackedPoints.map(p => p.t), 2) : 2;
+      const currentValue = kind === 'start' ? rangeStartTime : rangeEndTime;
+      const raw = window.prompt(`${kind === 'start' ? '開始' : '終了'}時刻を秒で入力してください`, currentValue.toFixed(1));
+      if (raw === null) return;
+
+      const nextValue = Number(raw);
+      if (!Number.isFinite(nextValue)) {
+        window.alert('数値を入力してください。');
+        return;
+      }
+
+      if (kind === 'start') {
+        rangeStartTime = Math.max(0, Math.min(nextValue, rangeEndTime - 0.1));
+      } else {
+        rangeEndTime = Math.max(rangeStartTime + 0.1, Math.min(nextValue, maxTime));
+      }
+
+      updateGraphs();
+    }
+
+    function renderMotion() {
+      updateReadouts();
+      drawVideoFrame();
+      drawCalibrationLines();
+      if (state.refColor) {
+        drawBallAt(state.initialX, state.initialY, '#fbbf24', 1);
+      }
+      updateGraphs();
+    }
+
+    function setInitialPositionFromClick(event) {
+      if (!video.videoWidth || !video.videoHeight) return;
+      const rect = canvas.getBoundingClientRect();
+      const px = (event.clientX - rect.left) * (canvas.width / rect.width);
+      const py = (event.clientY - rect.top) * (canvas.height / rect.height);
+      const videoRect = getVideoRect();
+
+      if (px < videoRect.x || px > videoRect.x + videoRect.width || py < videoRect.y || py > videoRect.y + videoRect.height) {
+        return;
+      }
+
+      const xVideo = (px - videoRect.x) / videoRect.scale;
+      const yVideo = (py - videoRect.y) / videoRect.scale;
+
+      initXInput.value = Math.max(0, Math.min(video.videoWidth, Math.round(xVideo)));
+      initYInput.value = Math.max(0, Math.min(video.videoHeight, Math.round(yVideo)));
+      updateReadouts();
+
+      state.initialX = Number(initXInput.value);
+      state.initialY = Number(initYInput.value);
+      state.lastPosition = { x: state.initialX, y: state.initialY };
+      state.trackedPoints = [{ x: state.initialX, y: state.initialY, t: 0 }];
+      state.lastTrackedTime = 0;
+
+      offscreen.width = video.videoWidth;
+      offscreen.height = video.videoHeight;
+      offscreenCtx.drawImage(video, 0, 0);
+      const imageData = offscreenCtx.getImageData(
+        Math.max(0, state.initialX - 12),
+        Math.max(0, state.initialY - 12),
+        Math.min(offscreen.width - Math.max(0, state.initialX - 12), 25),
+        Math.min(offscreen.height - Math.max(0, state.initialY - 12), 25)
+      );
+      state.refColor = sampleAverageColor(imageData, Math.min(12, imageData.width - 1), Math.min(12, imageData.height - 1), 5);
+      state.currentBall = { x: state.initialX, y: state.initialY };
+      renderMotion();
+    }
+
+    function togglePlayback() {
+      const shouldPlay = !state.isPlaying;
+      if (!video.src) return;
+
+      if (shouldPlay) {
+        const tryPlay = () => {
+          video.play()
+            .then(() => {
+              state.isPlaying = true;
+              playBtn.textContent = '停止';
+            })
+            .catch((error) => {
+              console.warn('video play failed:', error);
+              state.isPlaying = false;
+              playBtn.textContent = '再生';
+            });
+        };
+
+        if (video.readyState >= 2) {
+          tryPlay();
+        } else {
+          video.addEventListener('loadeddata', tryPlay, { once: true });
+        }
+      } else {
+        video.pause();
+        state.isPlaying = false;
+        playBtn.textContent = '再生';
+      }
+    }
+
+    fileInput.addEventListener('change', (event) => {
+      const file = event.target.files[0];
+      if (!file) return;
+      const url = URL.createObjectURL(file);
+      video.src = url;
+      video.load();
+      video.muted = true;
+      video.playbackRate = Number(playbackRateInput.value || 1);
+      state.videoLoaded = true;
+      state.refColor = null;
+      state.trackedPoints = [];
+      state.currentBall = null;
+      state.lastPosition = null;
+      state.isPlaying = false;
+      xCalibBtn.disabled = false;
+      yCalibBtn.disabled = true;
+      playBtn.disabled = true;
+      playBtn.textContent = '再生';
+      stageHint.textContent = '動画を選択して、ボールの初期位置をクリックしてください';
+    });
+
+    video.addEventListener('loadeddata', () => {
+      state.videoLoaded = true;
+      renderMotion();
+    });
+
+    video.addEventListener('play', () => {
+      state.isPlaying = true;
+      playBtn.textContent = '停止';
+    });
+
+    video.addEventListener('pause', () => {
+      state.isPlaying = false;
+      playBtn.textContent = '再生';
+    });
+
+    canvas.addEventListener('click', (event) => {
+      if (state.calibratingAxis) {
+        const pos = getCanvasPosition(event);
+        if (!state.calibrationStart) {
+          state.calibrationStart = pos;
+          state.calibrationPreviewEnd = pos;
+          return;
+        }
+
+        state.calibrationEnd = pos;
+        state.calibrationPreviewEnd = pos;
+        const lengthPx = Math.hypot(
+          state.calibrationEnd.x - state.calibrationStart.x,
+          state.calibrationEnd.y - state.calibrationStart.y
+        );
+
+        if (lengthPx < 10) {
+          state.calibrationStart = pos;
+          state.calibrationEnd = null;
+          state.calibrationPreviewEnd = pos;
+          return;
+        }
+
+        const cmValue = Number(window.prompt(`${state.calibratingAxis === 'x' ? 'x' : 'y'}軸の長さをcmで入力してください`, '10'));
+        if (Number.isFinite(cmValue) && cmValue > 0) {
+          applyAxisCalibration(state.calibratingAxis, cmValue, lengthPx);
+          renderMotion();
+        } else {
+          state.calibratingAxis = null;
+          state.calibrationStart = null;
+          state.calibrationEnd = null;
+          state.calibrationPreviewEnd = null;
+          stageHint.textContent = '動画を選択して、ボールの初期位置をクリックしてください';
+        }
+        return;
+      }
+
+      setInitialPositionFromClick(event);
+    });
+
+    canvas.addEventListener('mousemove', (event) => {
+      if (!state.calibratingAxis || !state.calibrationStart) return;
+      updateCalibrationPreview(event);
+    });
+
+    playBtn.addEventListener('click', togglePlayback);
+    resetBtn.addEventListener('click', resetToInitialState);
+    xCalibBtn.addEventListener('click', () => beginAxisCalibration('x'));
+    yCalibBtn.addEventListener('click', () => beginAxisCalibration('y'));
+    updateBtn.addEventListener('click', () => {
+      if (state.refColor) renderMotion();
+    });
+
+    initXInput.addEventListener('input', () => {
+      updateReadouts();
+      if (video.readyState >= 2) {
+        refreshReferenceFromInitialPosition();
+      }
+      renderMotion();
+    });
+    initYInput.addEventListener('input', () => {
+      updateReadouts();
+      if (video.readyState >= 2) {
+        refreshReferenceFromInitialPosition();
+      }
+      renderMotion();
+    });
+    playbackRateInput.addEventListener('input', updatePlaybackRate);
+    timeMinDownBtn.addEventListener('click', () => adjustTimeRange('start', -0.1));
+    setTimeMinBtn.addEventListener('click', () => promptTimeRange('start'));
+    timeMinUpBtn.addEventListener('click', () => adjustTimeRange('start', 0.1));
+    timeMaxDownBtn.addEventListener('click', () => adjustTimeRange('end', -0.1));
+    setTimeMaxBtn.addEventListener('click', () => promptTimeRange('end'));
+    timeMaxUpBtn.addEventListener('click', () => adjustTimeRange('end', 0.1));
+
+    updateReadouts();
+    updatePlaybackRate();
+    updateGraphs();
+    xCalibBtn.disabled = true;
+    yCalibBtn.disabled = true;
+    playBtn.disabled = true;
+    renderMotion();
+    requestAnimationFrame(render);
+  </script>
+</body>
+</html>

@@ -1,0 +1,291 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>成績入力（6教科）</title>
+<style>
+  :root{--bg:#f6f9fc;--card:#fff;--muted:#666}
+  body{font-family:system-ui, -apple-system, "Hiragino Kaku Gothic ProN", "メイリオ", sans-serif;margin:16px;background:var(--bg);color:#111}
+  .toolbar{display:flex;gap:8px;align-items:center;margin-bottom:12px}
+  select,input,button{padding:8px;border-radius:6px;border:1px solid #ccc;background:#fff}
+  .container{background:var(--card);padding:12px;border-radius:10px;box-shadow:0 6px 18px rgba(0,0,0,0.06)}
+  table{width:100%;border-collapse:collapse;font-size:14px}
+  th,td{border:1px solid #e6eef6;padding:6px;text-align:center}
+  th{background:#f0f7fb}
+  td.name{width:160px;text-align:left;padding-left:10px}
+  td input.cell{width:100%;border:0;padding:6px;text-align:center;background:transparent}
+  td input.cell:focus{outline:2px solid #cfeefc}
+  .small{font-size:13px;color:var(--muted)}
+  .actions{display:flex;gap:8px}
+  /* Print layout: A4 portrait, 4 cards per page (2x2) */
+  @media print{
+    body{margin:0}
+    .no-print{display:none}
+    .print-wrapper{display:flex;flex-wrap:wrap;width:210mm;height:297mm}
+    .card{box-sizing:border-box;width:50%;height:50%;padding:12mm;border:0}
+    .card .sheet{border:1px solid #000;padding:8px;height:100%}
+    .page-break{page-break-after:always}
+  }
+  /* Screen preview of print cards */
+  .print-wrapper{display:none}
+  .cards-preview{display:none}
+</style>
+</head>
+<body>
+<div class="toolbar no-print">
+  <label>学年
+    <select id="gradeSelect">
+      <option value="1">1年</option>
+      <option value="2">2年</option>
+      <option value="3">3年</option>
+    </select>
+  </label>
+  <label>クラス
+    <select id="classSelect"></select>
+  </label>
+  <div class="actions">
+    <button id="modeToggle">印刷モードに切替</button>
+    <button id="clearBtn">全クリア</button>
+    <button id="pasteBtn">貼り付け（Excelから）</button>
+    <button id="printBtn">選択クラスを印刷</button>
+  </div>
+</div>
+
+<div class="container">
+  <div class="small">最大 40 人。名前欄は自由入力。セルに数値を直接入力、またはExcelからコピーして1セル目を選択して貼り付けできます。</div>
+  <table id="scoreTable">
+    <thead>
+      <tr>
+        <th>No</th>
+        <th>氏名</th>
+        <th>国語</th>
+        <th>社会</th>
+        <th>数学</th>
+        <th>理科</th>
+        <th>英語</th>
+        <th>工業</th>
+        <th>5科合計</th>
+        <th>6科合計</th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+</div>
+
+<!-- Print wrapper generated dynamically -->
+<div id="printArea" class="print-wrapper"></div>
+
+<script>
+const gradeSelect = document.getElementById('gradeSelect');
+const classSelect = document.getElementById('classSelect');
+const tbody = document.querySelector('#scoreTable tbody');
+const modeToggle = document.getElementById('modeToggle');
+const clearBtn = document.getElementById('clearBtn');
+const pasteBtn = document.getElementById('pasteBtn');
+const printBtn = document.getElementById('printBtn');
+const printArea = document.getElementById('printArea');
+
+const classesByGrade = {
+  '1': ['機械システム科','建設科','電子科'],
+  '2': ['機械科','生産機械科','建設科','電子科'],
+  '3': ['機械科','生産機械科','建設科','電子科']
+};
+
+let modePrint = false;
+const MAX = 40;
+
+function buildClassOptions(){
+  const g = gradeSelect.value;
+  classSelect.innerHTML = '';
+  classesByGrade[g].forEach(c=>{
+    const o = document.createElement('option'); o.value = c; o.textContent = c; classSelect.appendChild(o);
+  });
+}
+
+function createRow(i){
+  const tr = document.createElement('tr');
+  tr.dataset.index = i;
+  tr.innerHTML = `
+    <td>${i+1}</td>
+    <td class="name"><input class="cell nameCell" data-col="name"></td>
+    <td><input class="cell numCell" data-col="kokugo"></td>
+    <td><input class="cell numCell" data-col="shakai"></td>
+    <td><input class="cell numCell" data-col="sansu"></td>
+    <td><input class="cell numCell" data-col="rika"></td>
+    <td><input class="cell numCell" data-col="english"></td>
+    <td><input class="cell numCell" data-col="kougyou"></td>
+    <td class="sum5 small">0</td>
+    <td class="sum6 small">0</td>
+  `;
+  // events
+  tr.querySelectorAll('.numCell').forEach(inp=>{
+    inp.addEventListener('input', ()=>updateRowSum(tr));
+    inp.addEventListener('paste', handlePasteIntoCell);
+  });
+  tr.querySelector('.nameCell').addEventListener('paste', handlePasteIntoCell);
+  return tr;
+}
+
+function initTable(){
+  tbody.innerHTML = '';
+  for(let i=0;i<MAX;i++) tbody.appendChild(createRow(i));
+}
+
+function toNumber(v){
+  const n = Number(String(v).replace(/[^0-9.-]/g,''));
+  return Number.isFinite(n)?n:0;
+}
+
+function updateRowSum(tr){
+  const kokugo = toNumber(tr.querySelector('input[data-col="kokugo"]').value);
+  const shakai = toNumber(tr.querySelector('input[data-col="shakai"]').value);
+  const sansu = toNumber(tr.querySelector('input[data-col="sansu"]').value);
+  const rika = toNumber(tr.querySelector('input[data-col="rika"]').value);
+  const eng = toNumber(tr.querySelector('input[data-col="english"]').value);
+  const kou = toNumber(tr.querySelector('input[data-col="kougyou"]').value);
+  const sum5 = kokugo+shakai+sansu+rika+eng;
+  const sum6 = sum5 + kou;
+  tr.querySelector('.sum5').textContent = sum5;
+  tr.querySelector('.sum6').textContent = sum6;
+}
+
+function handlePasteIntoCell(e){
+  // allow Excel paste: parse TSV and fill starting from focused cell
+  const clipboard = (e.clipboardData || window.clipboardData);
+  if(!clipboard) return;
+  const text = clipboard.getData('text');
+  if(!text) return;
+  e.preventDefault();
+  const start = e.target;
+  // find starting position
+  const startRow = start.closest('tr');
+  const startIndex = Number(startRow.dataset.index);
+  // parse lines and tabs
+  const rows = text.replace(/\r/g,'').split('\n').filter(r=>r.length>0).map(r=>r.split('\t'));
+  for(let r=0;r<rows.length;r++){
+    for(let c=0;c<rows[r].length;c++){
+      const rr = startIndex + r;
+      const cc = c; // map to columns: 0->name,1->kokugo,2->shakai... typical Excel order
+      if(rr>=MAX) continue;
+      const targetRow = tbody.querySelector(`tr[data-index="${rr}"]`);
+      if(!targetRow) continue;
+      if(cc===0){ targetRow.querySelector('input[data-col="name"]').value = rows[r][c]; }
+      else if(cc>=1 && cc<=6){
+        const map = ['kokugo','shakai','sansu','rika','english','kougyou'];
+        targetRow.querySelector(`input[data-col="${map[cc-1]}"]`).value = rows[r][c];
+      }
+      updateRowSum(targetRow);
+    }
+  }
+}
+
+function gatherClassData(){
+  const data = [];
+  tbody.querySelectorAll('tr').forEach(tr=>{
+    const name = tr.querySelector('input[data-col="name"]').value.trim();
+    const kokugo = toNumber(tr.querySelector('input[data-col="kokugo"]').value);
+    const shakai = toNumber(tr.querySelector('input[data-col="shakai"]').value);
+    const sansu = toNumber(tr.querySelector('input[data-col="sansu"]').value);
+    const rika = toNumber(tr.querySelector('input[data-col="rika"]').value);
+    const english = toNumber(tr.querySelector('input[data-col="english"]').value);
+    const kougyou = toNumber(tr.querySelector('input[data-col="kougyou"]').value);
+    const sum5 = kokugo+shakai+sansu+rika+english;
+    const sum6 = sum5 + kougyou;
+    data.push({name,kokugo,shakai,sansu,rika,english,kougyou,sum5,sum6});
+  });
+  return data;
+}
+
+function buildPrintCards(){
+  printArea.innerHTML = '';
+  const data = gatherClassData();
+  // show 40 students in order
+  for(let i=0;i<MAX;i++){
+    const st = data[i];
+    const card = document.createElement('div'); card.className='card';
+    const inner = document.createElement('div'); inner.className='sheet';
+    inner.innerHTML = `<div style="font-weight:700;margin-bottom:6px">${gradeSelect.value}年 ${classSelect.value} - No.${i+1} ${st.name||''}</div>
+      <table style="width:100%;font-size:13px;border-collapse:collapse"><tr><td>国語</td><td>${st.kokugo}</td><td>社会</td><td>${st.shakai}</td></tr>
+      <tr><td>数学</td><td>${st.sansu}</td><td>理科</td><td>${st.rika}</td></tr>
+      <tr><td>英語</td><td>${st.english}</td><td>工業</td><td>${st.kougyou}</td></tr>
+      <tr><td>5科合計</td><td colspan="3">${st.sum5}</td></tr>
+      <tr><td>6科合計</td><td colspan="3">${st.sum6}</td></tr></table>`;
+    card.appendChild(inner);
+    printArea.appendChild(card);
+  }
+}
+
+// paste button uses clipboard API: copies clipboard text and simulates paste start at first selected cell
+pasteBtn.addEventListener('click', async ()=>{
+  try{
+    const text = await navigator.clipboard.readText();
+    if(!text) return alert('クリップボードにテキストがありません');
+    // ask where to start
+    const r = prompt('貼り付け開始行番号を入力してください (1-40)（何も入れない＝1）');
+    const start = Math.min(MAX, Math.max(1, Number(r)||1)) -1;
+    const rows = text.replace(/\r/g,'').split('\n').filter(rr=>rr.length>0).map(rr=>rr.split('\t'));
+    for(let rr=0;rr<rows.length;rr++){
+      for(let c=0;c<rows[rr].length;c++){
+        const rowIndex = start + rr;
+        if(rowIndex>=MAX) continue;
+        const tr = tbody.querySelector(`tr[data-index="${rowIndex}"]`);
+        if(!tr) continue;
+        if(c===0) tr.querySelector('input[data-col="name"]').value = rows[rr][c];
+        else if(c>=1 && c<=6){ const map = ['kokugo','shakai','sansu','rika','english','kougyou']; tr.querySelector(`input[data-col="${map[c-1]}"]`).value = rows[rr][c]; }
+        updateRowSum(tr);
+      }
+    }
+    alert('貼り付け完了');
+  }catch(e){alert('クリップボードの読み取りに失敗しました');}
+});
+
+clearBtn.addEventListener('click', ()=>{ if(!confirm('全データをクリアしますか？')) return; tbody.querySelectorAll('tr').forEach(tr=>{
+  tr.querySelectorAll('input').forEach(inp=>inp.value=''); updateRowSum(tr);
+});});
+
+printBtn.addEventListener('click', ()=>{
+  buildPrintCards();
+  // open print window
+  const w = window.open('', '_blank');
+  const style = `@page{size:A4;margin:8mm}@media print{.card{width:50%;height:50%;box-sizing:border-box;padding:12mm}}`;
+  w.document.write('<html><head><title>印刷プレビュー</title><meta charset="utf-8"><style>'+style+'</style></head><body>');
+  // copy nodes
+  const data = gatherClassData();
+  for(let i=0;i<MAX;i++){
+    const st = data[i];
+    const html = `<div style="width:50%;height:50%;float:left;box-sizing:border-box;padding:12mm;border:0"><div style="border:1px solid #000;padding:8px;height:100%"><div style="font-weight:700;margin-bottom:6px">${gradeSelect.value}年 ${classSelect.value} - No.${i+1} ${st.name||''}</div>
+      <table style="width:100%;font-size:13px;border-collapse:collapse"><tr><td>国語</td><td>${st.kokugo}</td><td>社会</td><td>${st.shakai}</td></tr>
+      <tr><td>数学</td><td>${st.sansu}</td><td>理科</td><td>${st.rika}</td></tr>
+      <tr><td>英語</td><td>${st.english}</td><td>工業</td><td>${st.kougyou}</td></tr>
+      <tr><td>5科合計</td><td colspan="3">${st.sum5}</td></tr>
+      <tr><td>6科合計</td><td colspan="3">${st.sum6}</td></tr></table></div></div>`;
+    w.document.write(html);
+  }
+  w.document.write('</body></html>');
+  w.document.close();
+  w.focus();
+  setTimeout(()=>w.print(),300);
+});
+
+modeToggle.addEventListener('click', ()=>{
+  modePrint = !modePrint;
+  modeToggle.textContent = modePrint? '入力モードに切替' : '印刷モードに切替';
+  if(modePrint){
+    // preview cards on screen
+    buildPrintCards(); document.querySelector('.print-wrapper').style.display='flex';
+  }else{
+    document.querySelector('.print-wrapper').style.display='none';
+  }
+});
+
+// initialize
+buildClassOptions(); initTable();
+gradeSelect.addEventListener('change', buildClassOptions);
+
+// allow click into cell to set focus for paste
+tbody.addEventListener('click', (e)=>{ const inp = e.target.closest('input'); if(inp) inp.focus(); });
+
+</script>
+</body>
+</html>
