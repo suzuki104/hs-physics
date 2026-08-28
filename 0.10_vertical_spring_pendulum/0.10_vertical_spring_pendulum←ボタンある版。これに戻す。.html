@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>鉛直ばね振り子</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
+    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <style>
+        input[type="range"] {
+            -webkit-appearance: none;
+            background: transparent;
+        }
+        input[type="range"]::-webkit-slider-runnable-track {
+            background: #e2e8f0;
+            height: 6px;
+            border-radius: 3px;
+        }
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            height: 16px;
+            width: 16px;
+            border-radius: 50%;
+            background: #2563eb;
+            margin-top: -5px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef, useMemo } = React;
+
+        const IconPlay = () => (
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+        );
+        const IconPause = () => (
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect></svg>
+        );
+        const IconRotate = () => (
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path><path d="M3 3v5h5"></path></svg>
+        );
+        const IconActivity = () => (
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>
+        );
+        const IconHome = () => (
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+        );
+        const IconList = () => (
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+        );
+
+        const App = () => {
+            const [mass, setMass] = useState(2.0);
+            const [k, setK] = useState(10.0);
+            const [amplitude, setAmplitude] = useState(60);
+            const [phaseType, setPhaseType] = useState("cos"); 
+            const g = 9.8; 
+            
+            const [isPlaying, setIsPlaying] = useState(false);
+            const [hasStarted, setHasStarted] = useState(false);
+            const [showX, setShowX] = useState(true);
+            const [showV, setShowV] = useState(true);
+            const [showA, setShowA] = useState(true);
+            const [time, setTime] = useState(0);
+            
+            const omega = useMemo(() => Math.sqrt(k / mass), [k, mass]);
+            const period = useMemo(() => 2 * Math.PI / omega, [omega]);
+            const equilibriumOffset = useMemo(() => (mass * g / k) * 20, [mass, k]);
+
+            const getPhysics = (t) => {
+                let x, v, a;
+                const wt = omega * t;
+                switch(phaseType) {
+                    case "sin":
+                        x = amplitude * Math.sin(wt);
+                        v = amplitude * omega * Math.cos(wt);
+                        a = -amplitude * omega * omega * Math.sin(wt);
+                        break;
+                    case "-sin":
+                        x = -amplitude * Math.sin(wt);
+                        v = -amplitude * omega * Math.cos(wt);
+                        a = amplitude * omega * omega * Math.sin(wt);
+                        break;
+                    case "cos":
+                        x = amplitude * Math.cos(wt);
+                        v = -amplitude * omega * Math.sin(wt);
+                        a = -amplitude * omega * omega * Math.cos(wt);
+                        break;
+                    case "-cos":
+                    default:
+                        x = -amplitude * Math.cos(wt);
+                        v = amplitude * omega * Math.sin(wt);
+                        a = amplitude * omega * omega * Math.cos(wt);
+                        break;
+                }
+                return { x, v, a };
+            };
+
+            const [history, setHistory] = useState([]);
+            const requestRef = useRef();
+
+            useEffect(() => {
+                if (window.MathJax && window.MathJax.typesetPromise) {
+                    window.MathJax.typesetPromise();
+                }
+            }, [mass, k]);
+
+            useEffect(() => {
+                setHistory([]);
+            }, [phaseType, amplitude, omega]);
+
+            const animate = () => {
+                if (isPlaying) {
+                    setTime(prevTime => {
+                        const newTime = prevTime + 0.02;
+                        const state = getPhysics(newTime);
+                        setHistory(prev => {
+                            const newHistory = [...prev, { t: newTime, ...state }];
+                            return newHistory.length > 800 ? newHistory.slice(1) : newHistory;
+                        });
+                        return newTime;
+                    });
+                }
+                requestRef.current = requestAnimationFrame(animate);
+            };
+
+            useEffect(() => {
+                requestRef.current = requestAnimationFrame(animate);
+                return () => cancelAnimationFrame(requestRef.current);
+            }, [isPlaying, phaseType, amplitude, omega]);
+
+            const handleTogglePlay = () => {
+                if (!hasStarted) setHasStarted(true);
+                setIsPlaying(!isPlaying);
+            };
+
+            const resetSimulation = () => {
+                setTime(0);
+                setIsPlaying(false);
+                setHasStarted(false);
+                setHistory([]);
+            };
+
+            const canvasWidth = 600;
+            const canvasHeight = 400;
+            const centerX = canvasWidth / 2;
+            const ceilingY = 40;
+            const objectSize = 40;
+            const axisX = centerX - 120;
+            
+            const naturalLengthY = ceilingY + 100;
+            const eqY = naturalLengthY + equilibriumOffset;
+            const physicsState = getPhysics(time);
+            const currentY = eqY + physicsState.x;
+
+            const renderSpring = () => {
+                const segments = 30;
+                const springPath = [];
+                const startY = ceilingY;
+                const endY = currentY - (objectSize / 2);
+                const dist = endY - startY;
+                
+                for (let i = 0; i <= segments; i++) {
+                    const py = startY + (dist / segments) * i;
+                    let px = centerX;
+                    if (i > 0 && i < segments) px = i % 2 === 0 ? centerX + 15 : centerX - 15;
+                    springPath.push(`${px},${py}`);
+                }
+                return springPath.join(' ');
+            };
+
+            const getGraphPoints = (type) => {
+                if (history.length === 0) return "";
+                const margin = 40;
+                const graphWidth = 520;
+                const maxT = Math.max(time, 5);
+                return history.map(d => {
+                    const xCoord = margin + (d.t / maxT) * graphWidth;
+                    let val = 0;
+                    let scale = 0.8;
+                    if (type === 'x') val = d.x;
+                    if (type === 'v') { val = d.v; scale = 0.8 / omega; }
+                    if (type === 'a') { val = d.a; scale = 0.8 / (omega * omega); }
+                    const yCoord = 100 - (val * scale);
+                    return `${xCoord},${yCoord}`;
+                }).join(' ');
+            };
+
+            return (
+                <div className="flex flex-col items-center p-4 bg-slate-100 min-h-screen font-sans text-slate-900">
+                    <div className="max-w-4xl w-full bg-white rounded-2xl shadow-2xl p-6 md:p-8">
+                        
+                        <h1 className="text-2xl font-bold text-slate-800 mb-6 flex items-center gap-2">
+                            <span className="text-blue-600"><IconActivity /></span>
+                            鉛直ばね振り子
+                        </h1>
+
+                        <div className="relative w-full h-[400px] bg-gradient-to-b from-slate-50 to-white rounded-t-lg border border-slate-300 overflow-hidden mb-0">
+                            <svg width="100%" height="100%" viewBox={`0 0 ${canvasWidth} ${canvasHeight}`} preserveAspectRatio="xMidYMid meet">
+                                <rect x={centerX - 100} y="0" width="200" height={ceilingY} fill="#475569" />
+                                <line x1={centerX - 100} y1={ceilingY} x2={centerX + 100} y2={ceilingY} stroke="#1e293b" strokeWidth="4" />
+                                
+                                <g>
+                                    <line x1={axisX} y1={ceilingY} x2={axisX} y2={canvasHeight - 40} stroke="#334155" strokeWidth="2" markerEnd="url(#axisArrow)" />
+                                    <text x={axisX - 25} y={ceilingY + 10} fontSize="14" fontWeight="bold" fill="#334155">y</text>
+                                    <line x1={axisX - 5} y1={eqY} x2={axisX + 5} y2={eqY} stroke="#334155" strokeWidth="2" />
+                                    <text x={axisX - 20} y={eqY + 5} fontSize="12" fill="#334155">O</text>
+                                </g>
+
+                                <line x1={centerX - 80} y1={naturalLengthY} x2={centerX + 80} y2={naturalLengthY} stroke="#94a3b8" strokeWidth="1" strokeDasharray="4" />
+                                <text x={centerX + 90} y={naturalLengthY + 5} fontSize="10" fill="#94a3b8">自然長</text>
+
+                                <line x1={centerX - 80} y1={eqY} x2={centerX + 80} y2={eqY} stroke="#ef4444" strokeWidth="1" strokeDasharray="4" opacity="0.6" />
+                                <text x={centerX + 90} y={eqY + 5} fontSize="10" fill="#ef4444">つりあい</text>
+
+                                <polyline points={renderSpring()} fill="none" stroke="#64748b" strokeWidth="2" strokeLinejoin="round" />
+                                
+                                <rect x={centerX - (objectSize/2)} y={currentY - (objectSize/2)} width={objectSize} height={objectSize} rx="4" fill="#2563eb" stroke="#1e3a8a" strokeWidth="1" />
+                                
+                                {/* PUSHガイドの表示判定: sin系の開始時のみ表示 */}
+                                {!isPlaying && !hasStarted && (
+                                    <g>
+                                        {phaseType === 'sin' && (
+                                            <g transform={`translate(${centerX}, ${currentY - (objectSize/2)})`}>
+                                                <text x="-22" y="-35" fontSize="14" fontWeight="900" fill="#f97316">PUSH!</text>
+                                                <path d="M-12,-20 L0,0 L12,-20 Z" fill="#f97316" />
+                                            </g>
+                                        )}
+                                        {phaseType === '-sin' && (
+                                            <g transform={`translate(${centerX}, ${currentY + (objectSize/2)})`}>
+                                                <text x="-22" y="45" fontSize="14" fontWeight="900" fill="#f97316">PUSH!</text>
+                                                <path d="M-12,20 L0,0 L12,20 Z" fill="#f97316" />
+                                            </g>
+                                        )}
+                                    </g>
+                                )}
+                                
+                                <defs>
+                                    <marker id="axisArrow" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto">
+                                        <polygon points="0 0, 10 3.5, 0 7" fill="#334155" />
+                                    </marker>
+                                </defs>
+                            </svg>
+                        </div>
+
+                        <div className="w-full h-64 bg-white rounded-b-lg p-4 mb-8 relative border border-slate-300 border-t-0 shadow-inner">
+                            <div className="absolute top-2 right-4 flex gap-2 z-10">
+                                <button onClick={() => setShowX(!showX)} className={`px-2 py-1 rounded text-[10px] font-bold transition shadow-sm ${showX ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-400'}`}>変位 y</button>
+                                <button onClick={() => setShowV(!showV)} className={`px-2 py-1 rounded text-[10px] font-bold transition shadow-sm ${showV ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-400'}`}>速度 v</button>
+                                <button onClick={() => setShowA(!showA)} className={`px-2 py-1 rounded text-[10px] font-bold transition shadow-sm ${showA ? 'bg-orange-600 text-white' : 'bg-slate-100 text-slate-400'}`}>加速度 a</button>
+                            </div>
+                            
+                            <svg width="100%" height="100%" viewBox="0 0 600 200" preserveAspectRatio="none">
+                                <line x1="40" y1="100" x2="580" y2="100" stroke="#475569" strokeWidth="2" />
+                                <line x1="40" y1="10" x2="40" y2="190" stroke="#475569" strokeWidth="2" />
+                                
+                                <text x="585" y="105" fontSize="12" fontWeight="bold" fill="#475569">t</text>
+                                {showX && <text x="25" y="20" fontSize="12" fontWeight="bold" fill="#2563eb">y</text>}
+                                {showV && <text x="10" y="20" fontSize="12" fontWeight="bold" fill="#059669">v</text>}
+                                {showA && <text x="-5" y="20" fontSize="12" fontWeight="bold" fill="#ea580c" transform="translate(45,0)">a</text>}
+
+                                {showA && <polyline points={getGraphPoints('a')} fill="none" stroke="#f97316" strokeWidth="2" opacity="0.6" />}
+                                {showV && <polyline points={getGraphPoints('v')} fill="none" stroke="#10b981" strokeWidth="2" opacity="0.6" />}
+                                {showX && <polyline points={getGraphPoints('x')} fill="none" stroke="#3b82f6" strokeWidth="2.5" />}
+                                
+                                {history.length > 0 && isPlaying && (
+                                    <circle cx={40 + (time / Math.max(time, 5)) * 520} cy={100 - (physicsState.x * 0.8)} r="3" fill="#3b82f6" />
+                                )}
+                            </svg>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-white p-6 rounded-xl border border-slate-200 mb-8">
+                            <div className="space-y-4">
+                                <div className="flex gap-4">
+                                    <button 
+                                        onClick={handleTogglePlay} 
+                                        className={`flex-1 py-3 rounded-lg font-bold text-white transition shadow-md flex items-center justify-center gap-2 ${!hasStarted ? 'bg-blue-600 hover:bg-blue-700' : isPlaying ? 'bg-amber-500 hover:bg-amber-600' : 'bg-emerald-600 hover:bg-emerald-700'}`}
+                                    >
+                                        {!hasStarted || !isPlaying ? <IconPlay /> : <IconPause />}
+                                        {!hasStarted ? 'スタート' : isPlaying ? '一時停止' : '再開'}
+                                    </button>
+                                    <button onClick={resetSimulation} className="p-3 bg-slate-100 rounded-lg text-slate-600 hover:bg-slate-200 transition">
+                                        <IconRotate />
+                                    </button>
+                                </div>
+                                
+                                <div>
+                                    <label className="text-xs font-bold block mb-2 text-slate-500 uppercase tracking-wider">初期状態</label>
+                                    <select 
+                                        value={phaseType} 
+                                        onChange={(e) => {setPhaseType(e.target.value); resetSimulation();}}
+                                        className="w-full p-2 border border-slate-300 rounded-md text-sm font-bold bg-slate-50 focus:ring-2 focus:ring-blue-500 outline-none"
+                                    >
+                                        <option value="cos">下端から開始</option>
+                                        <option value="-cos">上端から開始</option>
+                                        <option value="sin">中心から下へ開始</option>
+                                        <option value="-sin">中心から上へ開始</option>
+                                    </select>
+                                </div>
+
+                                <div className="p-4 bg-blue-50 rounded-lg border border-blue-100">
+                                    <p className="text-xs font-bold text-blue-800 mb-1 italic">Physics Note:</p>
+                                    <div className="text-sm text-blue-700 leading-relaxed">
+                                        鉛直ばね振り子では、重力とばねの力がつりあう位置を中心に単振動します。
+                                        {"周期 \\( T = 2\\pi \\sqrt{\\frac{m}{k}} \\) は水平ばね振り子と同じです。"}
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="space-y-4">
+                                <div>
+                                    <div className="flex justify-between items-center mb-1">
+                                        <label className="text-xs font-bold text-slate-600">質量 m: {mass.toFixed(1)} kg</label>
+                                    </div>
+                                    <input type="range" min="0.5" max="5.0" step="0.1" value={mass} onChange={(e) => setMass(parseFloat(e.target.value))} className="w-full" />
+                                </div>
+                                <div>
+                                    <div className="flex justify-between items-center mb-1">
+                                        <label className="text-xs font-bold text-slate-600">ばね定数 k: {k.toFixed(1)} N/m</label>
+                                    </div>
+                                    <input type="range" min="5.0" max="30.0" step="1.0" value={k} onChange={(e) => setK(parseFloat(e.target.value))} className="w-full" />
+                                </div>
+                                <div className="p-3 bg-slate-50 rounded-lg flex justify-around items-center border border-slate-100">
+                                    <div className="text-center">
+                                        <p className="text-[10px] text-slate-400 font-bold uppercase">周期 T</p>
+                                        <p className="text-sm font-mono font-bold text-blue-600">{period.toFixed(2)}s</p>
+                                    </div>
+                                    <div className="text-center">
+                                        <p className="text-[10px] text-slate-400 font-bold uppercase">つりあいの位置</p>
+                                        <p className="text-sm font-mono font-bold text-slate-800">{(equilibriumOffset/20).toFixed(2)}m</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="flex justify-center gap-4 border-t border-slate-100 pt-6">
+                            <a href="../6.0_home/home.html" className="flex items-center gap-2 px-6 py-2 bg-white border border-slate-200 rounded-full text-slate-600 hover:bg-slate-50 hover:border-slate-300 transition-all shadow-sm">
+                                <IconHome />
+                                <span className="text-sm font-bold">ホーム</span>
+                            </a>
+                            <a href="../6.1_physics_home/physics_home.html" className="flex items-center gap-2 px-6 py-2 bg-white border border-slate-200 rounded-full text-slate-600 hover:bg-slate-50 hover:border-slate-300 transition-all shadow-sm">
+                                <IconList />
+                                <span className="text-sm font-bold">物理一覧</span>
+                            </a>
+                        </div>
+
+                    </div>
+                    <p className="mt-4 text-slate-400 text-[10px] font-medium tracking-widest uppercase">Vertical Spring Pendulum Simulation v5.1</p>
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>

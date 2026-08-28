@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>直線上の2物体の衝突 - 物理シミュレーション</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        canvas {
+            background-color: #f8fafc;
+            border-bottom: 2px solid #cbd5e1;
+            touch-action: none;
+        }
+        .slider-label {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.875rem;
+            color: #475569;
+            margin-bottom: 0.25rem;
+        }
+    </style>
+</head>
+<body class="bg-slate-50 min-h-screen flex flex-col font-sans">
+
+    <!-- Header -->
+    <header class="bg-blue-600 text-white py-4 shadow-md">
+        <div class="container mx-auto px-4 text-center">
+            <h1 class="text-2xl font-bold">直線上の2物体の衝突</h1>
+            <p class="text-sm opacity-90">運動量保存則と反発係数のシミュレーション</p>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="flex-grow container mx-auto px-4 py-6 max-w-4xl">
+        <div class="bg-white rounded-xl shadow-lg overflow-hidden border border-slate-200">
+            
+            <!-- Canvas Area -->
+            <div class="relative">
+                <canvas id="canvas" class="w-full h-64"></canvas>
+                <div id="data-overlay" class="absolute top-2 left-2 bg-white/80 p-2 rounded text-xs font-mono shadow-sm">
+                    <div id="momentum-display">全運動量 P = --- kg・m/s</div>
+                </div>
+            </div>
+
+            <!-- Controls Area -->
+            <div class="p-6 space-y-8">
+                
+                <!-- Main Controls (Collision Coefficient & Start/Stop) -->
+                <div class="bg-blue-50 p-4 rounded-xl border border-blue-100 shadow-sm">
+                    <div class="flex flex-col md:flex-row md:items-center gap-6">
+                        <div class="flex-grow">
+                            <div class="slider-label font-bold text-blue-800">
+                                <span>反発係数 (e): <span id="e-val">0.50</span></span>
+                                <span class="text-xs font-normal text-blue-600">0:完全非弾性 / 1:弾性衝突</span>
+                            </div>
+                            <input type="range" id="e-slider" min="0" max="1" step="0.01" value="0.5" class="w-full h-2 bg-blue-200 rounded-lg appearance-none cursor-pointer">
+                        </div>
+                        <div class="flex flex-col sm:flex-row gap-2 flex-shrink-0">
+                            <button id="play-pause-btn" class="w-full md:w-32 bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg transition-all shadow-md active:scale-95 flex items-center justify-center gap-2">
+                                <span id="play-pause-icon">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clip-rule="evenodd" />
+                                    </svg>
+                                </span>
+                                <span id="play-pause-text">スタート</span>
+                            </button>
+                            <button id="reset-btn" class="w-full md:w-32 bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold py-3 px-4 rounded-lg transition-all shadow-md active:scale-95 flex items-center justify-center gap-2">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                    <path fill-rule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clip-rule="evenodd" />
+                                </svg>
+                                リセット
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Object Detailed Settings -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    <!-- Object 1 Controls -->
+                    <div class="space-y-4 p-4 rounded-lg bg-slate-50 border border-slate-100">
+                        <h2 class="font-bold text-blue-700 border-b border-blue-200 pb-1 flex items-center gap-2">
+                            <span class="w-3 h-3 bg-blue-600 rounded-full"></span>台車 A (左)
+                        </h2>
+                        <div>
+                            <div class="slider-label"><span>質量: <span id="m1-val">2.0</span> kg</span></div>
+                            <input type="range" id="m1-slider" min="1" max="10" step="0.5" value="2" class="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer">
+                        </div>
+                        <div>
+                            <div class="slider-label"><span>初速度: <span id="v1-val">2.0</span> m/s</span></div>
+                            <input type="range" id="v1-slider" min="0" max="10" step="0.5" value="2" class="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer">
+                        </div>
+                    </div>
+
+                    <!-- Object 2 Controls -->
+                    <div class="space-y-4 p-4 rounded-lg bg-slate-50 border border-slate-100">
+                        <h2 class="font-bold text-red-700 border-b border-red-200 pb-1 flex items-center gap-2">
+                            <span class="w-3 h-3 bg-red-600 rounded-full"></span>台車 B (右)
+                        </h2>
+                        <div>
+                            <div class="slider-label"><span>質量: <span id="m2-val">2.0</span> kg</span></div>
+                            <input type="range" id="m2-slider" min="1" max="10" step="0.5" value="2" class="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer">
+                        </div>
+                        <div>
+                            <div class="slider-label"><span>初速度: <span id="v2-val">-2.0</span> m/s</span></div>
+                            <input type="range" id="v2-slider" min="-10" max="0" step="0.5" value="-2" class="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer">
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Navigation Buttons -->
+        <div class="mt-8 flex justify-center gap-4">
+            <a href="../6.0_home/home.html" class="bg-slate-700 hover:bg-slate-800 text-white py-2 px-6 rounded-full text-sm font-medium transition-all shadow hover:shadow-lg">
+                ホーム
+            </a>
+            <a href="../6.1_physics_home/physics_home.html" class="bg-slate-700 hover:bg-slate-800 text-white py-2 px-6 rounded-full text-sm font-medium transition-all shadow hover:shadow-lg">
+                物理一覧
+            </a>
+        </div>
+    </main>
+
+    <!-- Footer / Copyright -->
+    <footer class="bg-slate-100 py-6 border-t border-slate-200 mt-auto">
+        <div class="container mx-auto px-4 text-center">
+            <p class="text-slate-500 text-sm" id="copyright">
+                Copyright &copy; 2021-<span id="current-year"></span> T.Suzuki
+            </p>
+        </div>
+    </footer>
+
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        const momentumDisplay = document.getElementById('momentum-display');
+
+        // UI Elements
+        const m1Slider = document.getElementById('m1-slider');
+        const v1Slider = document.getElementById('v1-slider');
+        const m2Slider = document.getElementById('m2-slider');
+        const v2Slider = document.getElementById('v2-slider');
+        const eSlider = document.getElementById('e-slider');
+        
+        const playPauseBtn = document.getElementById('play-pause-btn');
+        const playPauseText = document.getElementById('play-pause-text');
+        const playPauseIcon = document.getElementById('play-pause-icon');
+        const resetBtn = document.getElementById('reset-btn');
+
+        const m1Val = document.getElementById('m1-val');
+        const v1Val = document.getElementById('v1-val');
+        const m2Val = document.getElementById('m2-val');
+        const v2Val = document.getElementById('v2-val');
+        const eVal = document.getElementById('e-val');
+
+        // Physics State
+        let world = {
+            width: 0,
+            height: 0,
+            pixelsPerMeter: 40,
+            groundY: 0
+        };
+
+        let obj1, obj2;
+        let e = 0.5;
+        let isCollided = false;
+        let isRunning = false;
+
+        const ICON_PLAY = `<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clip-rule="evenodd" /></svg>`;
+        const ICON_PAUSE = `<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zM7 8a1 1 0 012 0v4a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v4a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd" /></svg>`;
+
+        function initCanvas() {
+            canvas.width = canvas.clientWidth;
+            canvas.height = canvas.clientHeight;
+            world.width = canvas.width;
+            world.height = canvas.height;
+            world.groundY = world.height * 0.8;
+            resetSimulation();
+        }
+
+        function resetSimulation() {
+            const m1 = parseFloat(m1Slider.value);
+            const v1 = parseFloat(v1Slider.value);
+            const m2 = parseFloat(m2Slider.value);
+            const v2 = parseFloat(v2Slider.value);
+            e = parseFloat(eSlider.value);
+
+            m1Val.textContent = m1.toFixed(1);
+            v1Val.textContent = v1.toFixed(1);
+            m2Val.textContent = m2.toFixed(1);
+            v2Val.textContent = v2.toFixed(1);
+            eVal.textContent = e.toFixed(2);
+
+            isCollided = false;
+            isRunning = false;
+            updatePlayPauseUI();
+
+            const sizeBase = 70; 
+            obj1 = {
+                m: m1,
+                v: v1,
+                x: world.width * 0.2,
+                w: sizeBase + m1 * 6,
+                h: 30,
+                color: '#2563eb'
+            };
+
+            obj2 = {
+                m: m2,
+                v: v2,
+                x: world.width * 0.8,
+                w: sizeBase + m2 * 6,
+                h: 30,
+                color: '#dc2626'
+            };
+        }
+
+        function togglePlayPause() {
+            isRunning = !isRunning;
+            updatePlayPauseUI();
+        }
+
+        function updatePlayPauseUI() {
+            if (isRunning) {
+                playPauseText.textContent = "ストップ";
+                playPauseIcon.innerHTML = ICON_PAUSE;
+                playPauseBtn.classList.replace('bg-blue-600', 'bg-amber-500');
+                playPauseBtn.classList.replace('hover:bg-blue-700', 'hover:bg-amber-600');
+            } else {
+                playPauseText.textContent = "スタート";
+                playPauseIcon.innerHTML = ICON_PLAY;
+                playPauseBtn.classList.replace('bg-amber-500', 'bg-blue-600');
+                playPauseBtn.classList.replace('hover:bg-amber-600', 'hover:bg-blue-700');
+            }
+        }
+
+        function resolveCollision() {
+            if (isCollided) return;
+
+            const m1 = obj1.m;
+            const m2 = obj2.m;
+            const v1 = obj1.v;
+            const v2 = obj2.v;
+
+            const newV1 = v1 - (1 + e) * m2 * (v1 - v2) / (m1 + m2);
+            const newV2 = v2 + (1 + e) * m1 * (v1 - v2) / (m1 + m2);
+
+            obj1.v = newV1;
+            obj2.v = newV2;
+            isCollided = true;
+        }
+
+        function update() {
+            if (!isRunning) {
+                // シミュレーション停止中も運動量表示だけは更新
+                updateStats();
+                return;
+            }
+
+            obj1.x += obj1.v * (world.pixelsPerMeter / 60);
+            obj2.x += obj2.v * (world.pixelsPerMeter / 60);
+
+            if (obj1.x + obj1.w/2 >= obj2.x - obj2.w/2) {
+                const overlap = (obj1.x + obj1.w/2) - (obj2.x - obj2.w/2);
+                obj1.x -= overlap / 2;
+                obj2.x += overlap / 2;
+                resolveCollision();
+            }
+
+            updateStats();
+        }
+
+        function updateStats() {
+            const pTotal = obj1.m * obj1.v + obj2.m * obj2.v;
+            momentumDisplay.innerHTML = `
+                <div>運動量 A: P<sub>A</sub> = ${(obj1.m * obj1.v).toFixed(2)} kg・m/s</div>
+                <div>運動量 B: P<sub>B</sub> = ${(obj2.m * obj2.v).toFixed(2)} kg・m/s</div>
+                <div class="mt-1 font-bold border-t border-slate-400 pt-1">全運動量 P = ${pTotal.toFixed(2)} kg・m/s</div>
+            `;
+        }
+
+        function drawCart(obj, label) {
+            const wheelRadius = 8;
+            const wheelY = world.groundY - wheelRadius;
+            
+            ctx.fillStyle = obj.color;
+            ctx.fillRect(obj.x - obj.w/2, world.groundY - obj.h - (wheelRadius * 2), obj.w, obj.h);
+            
+            ctx.fillStyle = '#334155';
+            ctx.beginPath();
+            ctx.arc(obj.x - obj.w/4, wheelY, wheelRadius, 0, Math.PI * 2);
+            ctx.arc(obj.x + obj.w/4, wheelY, wheelRadius, 0, Math.PI * 2);
+            ctx.fill();
+            
+            ctx.fillStyle = '#cbd5e1';
+            ctx.beginPath();
+            ctx.arc(obj.x - obj.w/4, wheelY, 2, 0, Math.PI * 2);
+            ctx.arc(obj.x + obj.w/4, wheelY, 2, 0, Math.PI * 2);
+            ctx.fill();
+
+            if (Math.abs(obj.v) > 0.05) {
+                ctx.strokeStyle = '#1e293b';
+                ctx.lineWidth = 2;
+                const arrowScale = 15;
+                const startX = obj.x;
+                const startY = world.groundY - obj.h - (wheelRadius * 2) - 15;
+                const endX = startX + obj.v * arrowScale;
+                
+                ctx.beginPath();
+                ctx.moveTo(startX, startY);
+                ctx.lineTo(endX, startY);
+                const head = 5;
+                const dir = obj.v > 0 ? 1 : -1;
+                ctx.lineTo(endX - head * dir, startY - head);
+                ctx.moveTo(endX, startY);
+                ctx.lineTo(endX - head * dir, startY + head);
+                ctx.stroke();
+            }
+
+            ctx.fillStyle = '#1e293b';
+            ctx.font = 'bold 12px sans-serif';
+            ctx.textAlign = 'center';
+            const labelYBase = world.groundY - obj.h - (wheelRadius * 2);
+            ctx.fillText(`${label} (${obj.m}kg)`, obj.x, labelYBase - 30);
+            ctx.fillText(`${obj.v.toFixed(2)} m/s`, obj.x, labelYBase - 45);
+        }
+
+        function draw() {
+            ctx.clearRect(0, 0, world.width, world.height);
+
+            ctx.strokeStyle = '#94a3b8';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(0, world.groundY);
+            ctx.lineTo(world.width, world.groundY);
+            ctx.stroke();
+
+            ctx.strokeStyle = '#e2e8f0';
+            ctx.lineWidth = 1;
+            for(let i = 0; i < world.width; i += world.pixelsPerMeter) {
+                ctx.beginPath();
+                ctx.moveTo(i, world.groundY);
+                ctx.lineTo(i, world.groundY + 10);
+                ctx.stroke();
+            }
+
+            drawCart(obj1, "台車 A");
+            drawCart(obj2, "台車 B");
+        }
+
+        function loop() {
+            update();
+            draw();
+            requestAnimationFrame(loop);
+        }
+
+        [m1Slider, v1Slider, m2Slider, v2Slider, eSlider].forEach(slider => {
+            slider.addEventListener('input', () => {
+                resetSimulation();
+            });
+        });
+
+        playPauseBtn.addEventListener('click', togglePlayPause);
+        resetBtn.addEventListener('click', resetSimulation);
+        window.addEventListener('resize', initCanvas);
+
+        document.getElementById('current-year').textContent = new Date().getFullYear();
+
+        window.onload = () => {
+            initCanvas();
+            loop();
+        };
+    </script>
+</body>
+</html>

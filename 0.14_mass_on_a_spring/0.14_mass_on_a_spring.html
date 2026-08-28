@@ -1,0 +1,455 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>縮まないばねと物体による落下運動 - Physics Sim</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            background-color: #f1f5f9;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        canvas {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            /* Allow touch scrolling */
+            touch-action: pan-y;
+        }
+        .custom-range {
+            height: 6px;
+            background: #e2e8f0;
+            border-radius: 5px;
+            outline: none;
+            transition: opacity .2s;
+        }
+        /* Adjusted animation height for mobile devices */
+        @media (max-width: 1023px) {
+            #simCanvas {
+                max-height: 250px; /* Further reduced height for better vertical space */
+                object-fit: contain;
+            }
+        }
+    </style>
+</head>
+<body class="min-h-screen p-2 md:p-4">
+
+    <div class="max-w-[1600px] mx-auto">
+        <header class="mb-4 text-center">
+            <h1 class="text-2xl font-extrabold text-slate-900 mb-1">縮まないばねと物体による落下運動</h1>
+            
+            <div class="flex flex-row gap-4 max-w-sm mx-auto">
+                <button id="playPauseBtn" class="flex-1 py-2 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 active:scale-95 transition-all shadow-md font-bold flex items-center justify-center gap-2 text-sm">
+                    <span id="btnIcon">▶</span> <span id="btnText">落下開始</span>
+                </button>
+                <button id="resetBtn" class="flex-1 py-2 bg-white text-slate-700 border border-slate-300 rounded-xl hover:bg-slate-50 active:scale-95 transition-all font-bold shadow-sm text-sm">
+                    リセット
+                </button>
+            </div>
+        </header>
+
+        <!-- 3-column layout -->
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-3">
+            
+            <!-- Left Column: Animation -->
+            <div class="lg:col-span-3">
+                <div class="bg-white p-3 rounded-2xl shadow-sm border border-slate-200 h-full flex items-center justify-center">
+                    <canvas id="simCanvas" width="400" height="650" class="w-full h-auto border-none shadow-none"></canvas>
+                </div>
+            </div>
+
+            <!-- Middle Column: Graphs -->
+            <div class="lg:col-span-6">
+                <div class="bg-white p-3 rounded-2xl shadow-sm border border-slate-200 h-full">
+                    <div class="flex flex-wrap items-center gap-4 mb-2 px-2">
+                        <label class="flex items-center gap-2 cursor-pointer group">
+                            <input type="checkbox" id="showTopGraph" checked class="w-3 h-3 rounded border-slate-300 text-blue-600 focus:ring-blue-500">
+                            <span class="text-[10px] font-bold text-blue-700">ばね上端</span>
+                        </label>
+                        <label class="flex items-center gap-2 cursor-pointer group">
+                            <input type="checkbox" id="showObjGraph" checked class="w-3 h-3 rounded border-slate-300 text-red-600 focus:ring-red-500">
+                            <span class="text-[10px] font-bold text-red-700">おもり</span>
+                        </label>
+                        <div class="ml-auto text-[10px] text-slate-400 italic">
+                            ※自然長(1.0m)になると、ばねはそれ以上伸び縮みしません。
+                        </div>
+                    </div>
+                    <canvas id="graphCanvas" width="800" height="650" class="w-full h-auto bg-slate-50"></canvas>
+                </div>
+            </div>
+
+            <!-- Right Column: Numeric Display & Controls -->
+            <div class="lg:col-span-3 flex flex-col gap-3">
+                <!-- Data Display -->
+                <div class="bg-slate-800 text-slate-100 p-4 rounded-2xl shadow-lg">
+                    <div class="flex justify-end items-center mb-2">
+                        <div class="font-bold text-emerald-400 font-mono text-lg">
+                            <span id="timeVal">0.00</span><span class="text-xs ml-1">s</span>
+                        </div>
+                    </div>
+                    <!-- Horizontal side-by-side layout for mobile and desktop -->
+                    <div class="grid grid-cols-2 lg:grid-cols-1 gap-2">
+                        <div class="p-2 bg-slate-700/50 rounded-xl border border-slate-600">
+                            <p class="text-blue-400 text-[10px] font-bold mb-1 border-b border-slate-600 pb-1">ばね上端 (y₁)</p>
+                            <div class="flex justify-between text-[11px] mb-0.5"><span>位置:</span><span id="y1Val" class="font-bold">0.00</span> m</div>
+                            <div class="flex justify-between text-[11px] mb-0.5"><span>速度:</span><span id="v1Val" class="font-bold">0.00</span> m/s</div>
+                            <div class="flex justify-between text-[11px] mb-0.5"><span>加速度:</span><span id="a1Val" class="font-bold">0.00</span> m/s²</div>
+                        </div>
+                        <div class="p-2 bg-slate-700/50 rounded-xl border border-slate-600">
+                            <p class="text-red-400 text-[10px] font-bold mb-1 border-b border-slate-600 pb-1">おもり (y₂)</p>
+                            <div class="flex justify-between text-[11px] mb-0.5"><span>位置:</span><span id="y2Val" class="font-bold">0.00</span> m</div>
+                            <div class="flex justify-between text-[11px] mb-0.5"><span>速度:</span><span id="v2Val" class="font-bold">0.00</span> m/s</div>
+                            <div class="flex justify-between text-[11px] mb-0.5"><span>加速度:</span><span id="a2Val" class="font-bold">0.00</span> m/s²</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Sliders -->
+                <div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-200 flex-1 flex flex-col gap-4">
+                    <div class="space-y-2">
+                        <div class="flex justify-between mb-0.5 text-[11px]">
+                            <label class="font-semibold text-slate-700">ばね定数 (k)</label>
+                            <span class="text-indigo-600 font-mono font-bold"><span id="kVal">20</span> N/m</span>
+                        </div>
+                        <input type="range" id="kInput" min="5" max="100" value="20" class="w-full custom-range">
+                    </div>
+                    <div class="space-y-2">
+                        <div class="flex justify-between mb-0.5 text-[11px]">
+                            <label class="font-semibold text-slate-700">質量 (m)</label>
+                            <span class="text-indigo-600 font-mono font-bold"><span id="mVal">10.0</span> kg</span>
+                        </div>
+                        <input type="range" id="mInput" min="1.0" max="50.0" step="1.0" value="10.0" class="w-full custom-range">
+                    </div>
+                    <div class="space-y-2">
+                        <div class="flex justify-between mb-0.5 text-[11px]">
+                            <label class="font-semibold text-slate-700">再生速度</label>
+                            <span class="text-indigo-600 font-mono font-bold"><span id="speedVal">1.0</span>x</span>
+                        </div>
+                        <input type="range" id="speedInput" min="0.01" max="1.0" step="0.01" value="1.0" class="w-full custom-range">
+                    </div>
+                    
+                    <div class="mt-auto pt-2 border-t border-slate-100">
+                        <p class="text-[9px] text-slate-400 leading-tight italic">
+                            ※シミュレーションは、ばねの質量(0.2kg)を考慮しています。
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer section with navigation and copyright -->
+        <footer class="mt-8 py-6 border-t border-slate-200">
+            <div class="flex justify-center gap-4 mb-4">
+                <!--//20260810<a href="../6.0_home/home.html" class="px-6 py-2 bg-slate-200 text-slate-700 rounded-lg hover:bg-slate-300 transition-colors font-bold text-sm">
+                    ホーム
+                </a>
+                <a href="../6.1_physics_home/physics_home.html" class="px-6 py-2 bg-slate-200 text-slate-700 rounded-lg hover:bg-slate-300 transition-colors font-bold text-sm">
+                    物理一覧
+                </a>//20260810-->
+            </div>
+            <div class="text-center">
+                <p class="text-slate-400 text-xs" id="copyright"></p>
+            </div>
+        </footer>
+    </div>
+
+    <script>
+        document.getElementById('copyright').innerHTML = `Copyright &copy; 2021-${new Date().getFullYear()} T.Suzuki`;
+
+        const canvas = document.getElementById('simCanvas');
+        const ctx = canvas.getContext('2d');
+        const graphCanvas = document.getElementById('graphCanvas');
+        const gctx = graphCanvas.getContext('2d');
+        
+        const y1Display = document.getElementById('y1Val');
+        const v1Display = document.getElementById('v1Val');
+        const a1Display = document.getElementById('a1Val');
+        const y2Display = document.getElementById('y2Val');
+        const v2Display = document.getElementById('v2Val');
+        const a2Display = document.getElementById('a2Val');
+        const timeDisplay = document.getElementById('timeVal');
+        const playPauseBtn = document.getElementById('playPauseBtn');
+        const btnIcon = document.getElementById('btnIcon');
+        const btnText = document.getElementById('btnText');
+
+        let k = 20;        
+        let m = 10.0;       
+        let simSpeed = 0.1; 
+        const m_spring = 0.2; 
+        const g = 9.8;     
+        const ppi = 45;    
+        
+        const ceilingY_m = 0.3; 
+        const naturalLength_m = 1.0; 
+        const fallLimit_m = 40; 
+        
+        let springTopY = ceilingY_m; 
+        let objectY = 0; 
+        let v_top = 0, v_obj = 0;    
+        let a_top = 0, a_obj = 0;
+        let isRunning = false;
+        let isAttached = true;
+        let isLatched = false;
+        let lastTime = 0;
+        let elapsedSimTime = 0;
+        
+        let history = []; 
+
+        const kInput = document.getElementById('kInput');
+        const mInput = document.getElementById('mInput');
+        const speedInput = document.getElementById('speedInput');
+
+        function init() {
+            k = parseFloat(kInput.value);
+            m = parseFloat(mInput.value);
+            simSpeed = parseFloat(speedInput.value);
+            resetSimulation();
+        }
+
+        function resetSimulation() {
+            isRunning = false;
+            isAttached = true;
+            isLatched = false;
+            elapsedSimTime = 0;
+            history = [];
+            springTopY = ceilingY_m;
+            objectY = ceilingY_m + naturalLength_m + (m * g / k);
+            v_top = 0; v_obj = 0;
+            a_top = 0; a_obj = 0;
+            
+            btnIcon.innerText = "▶";
+            btnText.innerText = "落下開始";
+            updateValueDisplay();
+            draw();
+        }
+
+        function updateValueDisplay() {
+            y1Display.innerText = Math.max(0, (springTopY - ceilingY_m)).toFixed(2);
+            v1Display.innerText = v_top.toFixed(2);
+            a1Display.innerText = a_top.toFixed(2);
+            y2Display.innerText = Math.max(0, (objectY - ceilingY_m)).toFixed(3);
+            v2Display.innerText = v_obj.toFixed(3);
+            a2Display.innerText = a_obj.toFixed(2);
+            timeDisplay.innerText = elapsedSimTime.toFixed(2);
+        }
+
+        kInput.addEventListener('input', (e) => { 
+            document.getElementById('kVal').innerText = e.target.value;
+            k = parseFloat(e.target.value);
+            if(isAttached) resetSimulation();
+        });
+        mInput.addEventListener('input', (e) => { 
+            document.getElementById('mVal').innerText = parseFloat(e.target.value).toFixed(1);
+            m = parseFloat(e.target.value);
+            if(isAttached) resetSimulation();
+        });
+        speedInput.addEventListener('input', (e) => {
+            document.getElementById('speedVal').innerText = parseFloat(e.target.value).toFixed(2);
+            simSpeed = parseFloat(e.target.value);
+        });
+        
+        playPauseBtn.addEventListener('click', () => { 
+            isRunning = !isRunning; 
+            if (isRunning) {
+                isAttached = false;
+                btnIcon.innerText = "⏸";
+                btnText.innerText = "一時停止";
+            } else {
+                btnIcon.innerText = "▶";
+                btnText.innerText = "再開";
+            }
+        });
+        
+        document.getElementById('resetBtn').addEventListener('click', resetSimulation);
+
+        function drawSpring(yTop, yBottom) {
+            const coils = 30; 
+            const width = 12; 
+            const length = yBottom - yTop;
+            const centerX = canvas.width / 2;
+            ctx.beginPath();
+            ctx.strokeStyle = '#64748b';
+            ctx.lineWidth = 2.5; 
+            ctx.moveTo(centerX, yTop);
+            for (let i = 0; i <= coils; i++) {
+                const fraction = i / coils;
+                const currY = yTop + fraction * length;
+                const currX = centerX + (i === 0 || i === coils ? 0 : (i % 2 === 0 ? width : -width));
+                ctx.lineTo(currX, currY);
+            }
+            ctx.stroke();
+        }
+
+        function drawGraph() {
+            gctx.clearRect(0, 0, graphCanvas.width, graphCanvas.height);
+            const padding = 40; // Increased padding for larger text
+            const gWidth = graphCanvas.width - padding * 2;
+            const paneHeight = (graphCanvas.height - padding * 4) / 3; 
+
+            let maxT = Math.max(1.0, elapsedSimTime * 1.1);
+            const scaleT = gWidth / maxT;
+
+            const panes = [
+                { title: "変位 y (m)", propNames: ["dy_top", "dy_obj"], colors: ["#3b82f6", "#ef4444"] },
+                { title: "速度 v (m/s)", propNames: ["v_top", "v_obj"], colors: ["#3b82f6", "#ef4444"] },
+                { title: "加速度 a (m/s²)", propNames: ["a_top", "a_obj"], colors: ["#3b82f6", "#ef4444"] }
+            ];
+
+            panes.forEach((pane, idx) => {
+                const topY = padding + (paneHeight + padding) * idx;
+                const bottomY = topY + paneHeight;
+
+                gctx.strokeStyle = '#e2e8f0';
+                gctx.lineWidth = 1;
+                gctx.beginPath();
+                gctx.moveTo(padding, topY);
+                gctx.lineTo(padding, bottomY);
+                gctx.lineTo(graphCanvas.width - padding, bottomY);
+                gctx.stroke();
+
+                gctx.fillStyle = '#1e293b';
+                gctx.font = 'bold 16px sans-serif'; // Increased font size
+                gctx.textAlign = 'left';
+                gctx.fillText(pane.title, padding, topY - 12);
+
+                if (history.length < 2) return;
+
+                const showTop = document.getElementById('showTopGraph').checked;
+                const showObj = document.getElementById('showObjGraph').checked;
+                const vals = [];
+                if(showTop) vals.push(...history.map(d => d[pane.propNames[0]]));
+                if(showObj) vals.push(...history.map(d => d[pane.propNames[1]]));
+                
+                const minV = Math.min(0, ...vals);
+                const maxV = Math.max(1, ...vals);
+                const range = maxV - minV;
+                const scaleY = paneHeight / (range * 1.2);
+                const zeroY = bottomY + minV * scaleY;
+
+                gctx.setLineDash([3, 3]);
+                gctx.strokeStyle = '#cbd5e1';
+                gctx.beginPath();
+                gctx.moveTo(padding, zeroY);
+                gctx.lineTo(graphCanvas.width - padding, zeroY);
+                gctx.stroke();
+                gctx.setLineDash([]);
+
+                [0, 1].forEach(pIdx => {
+                    if ((pIdx === 0 && !showTop) || (pIdx === 1 && !showObj)) return;
+                    
+                    gctx.beginPath();
+                    gctx.strokeStyle = pane.colors[pIdx];
+                    gctx.lineWidth = 3; // Thicker lines for better visibility
+                    history.forEach((point, i) => {
+                        const x = padding + point.t * scaleT;
+                        const y = zeroY - point[pane.propNames[pIdx]] * scaleY;
+                        if (i === 0) gctx.moveTo(x, y); else gctx.lineTo(x, y);
+                    });
+                    gctx.stroke();
+                });
+
+                if (idx === 2) {
+                    gctx.fillStyle = '#64748b';
+                    gctx.font = '14px monospace'; // Increased time label size
+                    gctx.textAlign = 'right';
+                    gctx.fillText(maxT.toFixed(1) + "s", graphCanvas.width - padding, bottomY + 20);
+                }
+            });
+        }
+
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            const centerX = canvas.width / 2;
+            const drawTopY = springTopY * ppi;
+            const drawObjY = objectY * ppi;
+
+            ctx.fillStyle = '#334155';
+            ctx.fillRect(centerX - 50, (ceilingY_m * ppi) - 6, 100, 6);
+
+            drawSpring(drawTopY, drawObjY);
+
+            ctx.beginPath();
+            ctx.arc(centerX, drawObjY, 18, 0, Math.PI * 2); 
+            ctx.shadowBlur = 10;
+            ctx.shadowColor = 'rgba(0,0,0,0.1)';
+            ctx.fillStyle = isLatched ? '#10b981' : '#ef4444';
+            ctx.fill();
+            ctx.stroke();
+            ctx.shadowBlur = 0;
+            
+            ctx.beginPath();
+            ctx.arc(centerX, drawTopY, 6, 0, Math.PI * 2);
+            ctx.fillStyle = '#3b82f6';
+            ctx.fill();
+
+            drawGraph();
+        }
+
+        function update(timestamp) {
+            if (isRunning && !isAttached) {
+                const dt = Math.min((timestamp - lastTime) / 1000, 0.02) * simSpeed;
+                const subSteps = 20; 
+                const sdt = dt / subSteps;
+
+                for(let s = 0; s < subSteps; s++) {
+                    elapsedSimTime += sdt;
+                    const currentLength = objectY - springTopY;
+                    
+                    if (!isLatched && currentLength <= naturalLength_m) {
+                        isLatched = true;
+                        const v_combined = (m * v_obj + m_spring * v_top) / (m + m_spring);
+                        v_obj = v_combined;
+                        v_top = v_combined;
+                        objectY = springTopY + naturalLength_m;
+                    }
+
+                    if (isLatched) {
+                        a_obj = g;
+                        a_top = g;
+                        v_obj += a_obj * sdt;
+                        v_top += a_top * sdt;
+                        objectY += v_obj * sdt;
+                        springTopY += v_top * sdt;
+                    } else {
+                        const stretch = currentLength - naturalLength_m;
+                        const springForce = k * stretch;
+
+                        a_obj = g - (springForce / m);
+                        v_obj += a_obj * sdt;
+                        objectY += v_obj * sdt;
+
+                        a_top = g + (springForce / m_spring);
+                        v_top += a_top * sdt;
+                        springTopY += v_top * sdt;
+                    }
+
+                    if (s === subSteps - 1) {
+                        history.push({
+                            t: elapsedSimTime, 
+                            dy_top: springTopY - ceilingY_m, 
+                            dy_obj: objectY - ceilingY_m,
+                            v_top: v_top,
+                            v_obj: v_obj,
+                            a_top: a_top,
+                            a_obj: a_obj
+                        });
+                        if (history.length > 2000) history.shift();
+                    }
+                }
+
+                updateValueDisplay();
+                if (springTopY > fallLimit_m) isRunning = false;
+            }
+            
+            lastTime = timestamp;
+            draw();
+            requestAnimationFrame(update);
+        }
+
+        init();
+        requestAnimationFrame(update);
+
+    </script>
+</body>
+</html>

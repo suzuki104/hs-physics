@@ -1,0 +1,470 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>物理シミュレーション：固定されていない台と物体の運動</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- KaTeX for math rendering -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+    <style>
+        canvas {
+            background-color: #f8fafc;
+            border-bottom: 4px solid #475569;
+            touch-action: none;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 font-sans">
+
+    <!-- ヘッダー -->
+    <nav class="bg-slate-800 text-white p-4 shadow-md">
+        <h1 class="text-xl font-bold ml-4 text-left">固定されていない台と物体の運動</h1>
+    </nav>
+
+    <main class="container mx-auto p-4 max-w-5xl">
+        <div class="bg-white rounded-xl shadow-lg overflow-hidden border border-gray-200">
+            <!-- シミュレーションエリア -->
+            <div class="relative">
+                <canvas id="simCanvas" class="w-full h-64"></canvas>
+                
+                <!-- 数値表示 -->
+                <div class="absolute top-2 left-2 flex gap-2">
+                    <div class="bg-blue-100 border border-blue-300 p-2 rounded text-xs">
+                        <span class="font-bold text-blue-800">物体A:</span> <span id="valVa">0.00</span> m/s
+                    </div>
+                    <div class="bg-orange-100 border border-orange-300 p-2 rounded text-xs">
+                        <span class="font-bold text-orange-800">物体B:</span> <span id="valVb">0.00</span> m/s
+                    </div>
+                </div>
+            </div>
+
+            <!-- コントロールパネル -->
+            <div class="p-6 grid grid-cols-1 md:grid-cols-3 gap-6 border-b border-gray-100">
+                <!-- ボタンエリア（左側へ移動） -->
+                <div class="flex items-end gap-2">
+                    <button id="btnStart" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded transition-all shadow-sm whitespace-nowrap">
+                        スタート
+                    </button>
+                    <button id="btnReset" class="flex-1 bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded transition-all shadow-sm whitespace-nowrap">
+                        リセット
+                    </button>
+                </div>
+
+                <!-- 初速度設定（中央） -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">初速度 <span id="mathV0"></span> (物体A)</label>
+                    <input type="range" id="inputV0" step="0.1" class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-600">
+                    <div class="text-right text-sm text-gray-500 mt-1"><span id="labelV0Display">4.0</span> m/s</div>
+                </div>
+
+                <!-- 質量比設定（右側） -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">質量比 (物体B / 物体A)</label>
+                    <input type="range" id="inputMassRatio" min="1" max="5" step="0.5" value="2" class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-orange-600">
+                    <div class="text-right text-sm text-gray-500 mt-1"><span id="labelMassRatio">2.0</span>倍</div>
+                </div>
+            </div>
+
+            <!-- 解説/グラフエリア -->
+            <div class="bg-gray-50 p-4 border-t border-gray-200">
+                <div class="flex justify-between items-center mb-2">
+                    <h3 class="font-bold text-gray-700 text-sm">速度変化グラフ ($v-t$グラフ)</h3>
+                    <div class="flex gap-4 text-xs">
+                        <label class="flex items-center gap-1 cursor-pointer">
+                            <input type="checkbox" id="showGraphA" checked class="accent-blue-600">
+                            <span class="text-blue-600 font-bold">■</span> 物体A
+                        </label>
+                        <label class="flex items-center gap-1 cursor-pointer">
+                            <input type="checkbox" id="showGraphB" checked class="accent-orange-600">
+                            <span class="text-orange-600 font-bold">■</span> 物体B
+                        </label>
+                    </div>
+                </div>
+                <canvas id="graphCanvas" class="w-full h-40 bg-white border border-gray-300 rounded"></canvas>
+            </div>
+        </div>
+
+        <!-- 物理のポイントセクション -->
+        <div id="physicsContent" class="mt-6 text-sm text-gray-600 leading-relaxed bg-white p-6 rounded-xl border border-gray-200 shadow">
+            <h2 class="text-lg font-bold text-gray-800 mb-2">物理のポイント</h2>
+            <ul class="list-disc ml-5 space-y-2">
+                <li><strong>摩擦力の作用:</strong> 物体Aが台Bに乗ると、Aは左向きに、Bは右向きに動摩擦力 $f = \mu' m g$ を受けます。</li>
+                <li><strong>内力と運動量保存:</strong> 台Bと床の間の摩擦がない場合、AとBの間に働く摩擦力は「内力」であり、系全体の運動量は保存されます：$m v_0 = (m + M)V$</li>
+                <li><strong>相対運動の終了:</strong> 相対速度が $0$ になると、2物体は一体となって等速直線運動を続けます。</li>
+            </ul>
+        </div>
+    </main>
+
+    <footer class="text-center p-8 text-gray-500">
+        <div class="flex justify-center gap-6 mb-6">
+            <!--//20260810<a href="../6.0_home/home.html" class="bg-gray-700 hover:bg-gray-900 text-white py-3 px-10 rounded-full transition-all font-bold shadow-md text-xl inline-block">ホーム</a>
+            <a href="../6.1_physics_home/physics_home.html" class="bg-gray-700 hover:bg-gray-900 text-white py-3 px-10 rounded-full transition-all font-bold shadow-md text-xl inline-block">物理一覧</a>
+        //20260810--></div>
+        <p id="copyright" class="text-xs"></p>
+    </footer>
+
+    <script>
+        document.getElementById('copyright').innerHTML = `Copyright &copy; 2021-${new Date().getFullYear()} T.Suzuki`;
+
+        const canvas = document.getElementById('simCanvas');
+        const ctx = canvas.getContext('2d');
+        const gCanvas = document.getElementById('graphCanvas');
+        const gCtx = gCanvas.getContext('2d');
+
+        let animationId;
+        let isRunning = false;
+        let time = 0;
+        
+        const mA = 1.0;
+        let mB = 2.0;
+        let v0 = 4.0;
+        const mu = 0.2; 
+        const g = 9.8;
+
+        let state = {
+            xa: 50,
+            xb: 200,
+            va: 0,
+            vb: 0,
+            history: []
+        };
+
+        const config = {
+            wa: 40,
+            ha: 30,
+            wb: 250, 
+            hb: 40,
+            groundY: 200,
+            stepX: 200,
+            pixelsPerMeter: 40
+        };
+
+        function renderMath() {
+            if (typeof renderMathInElement === 'function') {
+                renderMathInElement(document.body, {
+                    delimiters: [
+                        {left: '$$', right: '$$', display: true},
+                        {left: '$', right: '$', display: false}
+                    ],
+                    throwOnError: false
+                });
+                const mathV0 = document.getElementById('mathV0');
+                if (mathV0 && typeof katex !== 'undefined') {
+                    katex.render("v_0", mathV0);
+                }
+            }
+        }
+
+        function calculateMinV0() {
+            const wA_m = config.wa / config.pixelsPerMeter; 
+            const ratio = (mA + mB) / mB;
+            const minV0sq = 2 * mu * g * ratio * wA_m;
+            return Math.sqrt(minV0sq);
+        }
+
+        function calculateMaxV0() {
+            const L_max_m = (config.wb - config.wa) / config.pixelsPerMeter; 
+            const ratio = (mA + mB) / mB;
+            const maxV0sq = 2 * mu * g * ratio * L_max_m;
+            return Math.sqrt(maxV0sq);
+        }
+
+        function init() {
+            cancelAnimationFrame(animationId);
+            isRunning = false;
+            time = 0;
+            mB = parseFloat(document.getElementById('inputMassRatio').value) * mA;
+            
+            const minV = calculateMinV0();
+            const maxV = calculateMaxV0();
+            
+            const inputV0Elem = document.getElementById('inputV0');
+            inputV0Elem.min = minV.toFixed(1);
+            inputV0Elem.max = maxV.toFixed(1);
+            
+            let currentV = parseFloat(inputV0Elem.value);
+            if (isNaN(currentV) || currentV < minV) {
+                v0 = minV;
+                inputV0Elem.value = v0.toFixed(1);
+            } else if (currentV > maxV) {
+                v0 = maxV;
+                inputV0Elem.value = v0.toFixed(1);
+            } else {
+                v0 = currentV;
+            }
+
+            state.xa = 50; 
+            state.xb = config.stepX; 
+            state.va = v0;
+            state.vb = 0;
+            state.history = [];
+            
+            document.getElementById('btnStart').innerText = "スタート";
+            updateDisplay();
+            resize();
+            draw();
+            renderMath();
+        }
+
+        function resize() {
+            canvas.width = canvas.offsetWidth;
+            canvas.height = canvas.offsetHeight;
+            gCanvas.width = gCanvas.offsetWidth;
+            gCanvas.height = gCanvas.offsetHeight;
+            draw();
+        }
+
+        window.addEventListener('resize', resize);
+
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            ctx.strokeStyle = "#94a3b8";
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(config.stepX, config.groundY);
+            ctx.lineTo(canvas.width, config.groundY);
+            ctx.stroke();
+
+            ctx.fillStyle = "#e2e8f0";
+            ctx.fillRect(0, config.groundY - config.hb, config.stepX, config.hb);
+            ctx.beginPath();
+            ctx.moveTo(0, config.groundY - config.hb);
+            ctx.lineTo(config.stepX, config.groundY - config.hb);
+            ctx.lineTo(config.stepX, config.groundY);
+            ctx.stroke();
+
+            const by = config.groundY - config.hb;
+            ctx.fillStyle = "#fbbf24";
+            ctx.strokeStyle = "#b45309";
+            ctx.lineWidth = 2;
+            ctx.fillRect(state.xb, by, config.wb, config.hb);
+            ctx.strokeRect(state.xb, by, config.wb, config.hb);
+
+            ctx.save();
+            ctx.strokeStyle = "#b45309";
+            ctx.lineWidth = 1;
+            for (let i = 4; i < config.wb; i += 8) {
+                ctx.beginPath();
+                ctx.moveTo(state.xb + i, by);
+                ctx.lineTo(state.xb + i - 4, by + 6);
+                ctx.stroke();
+            }
+            ctx.restore();
+            
+            const ay = config.groundY - config.hb - config.ha;
+            ctx.fillStyle = "#60a5fa";
+            ctx.strokeStyle = "#1d4ed8";
+            ctx.fillRect(state.xa, ay, config.wa, config.ha);
+            ctx.strokeRect(state.xa, ay, config.wa, config.ha);
+
+            ctx.fillStyle = "#334155";
+            ctx.font = "bold 14px sans-serif";
+            ctx.fillText("A", state.xa + 15, ay + 20);
+            ctx.fillText("B", state.xb + config.wb/2 - 5, by + 28);
+
+            if (state.va > 0.01) {
+                drawArrow(state.xa + config.wa/2, ay - 10, state.va * 10, "#1d4ed8", "v", "A");
+            }
+            if (state.vb > 0.01) {
+                drawArrow(state.xb + config.wb/2, by - 15, state.vb * 10, "#b45309", "v", "B");
+            }
+
+            drawGraph();
+        }
+
+        function drawArrow(x, y, len, color, label, sub) {
+            if (len < 3) return;
+            ctx.strokeStyle = color;
+            ctx.fillStyle = color;
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(x, y);
+            ctx.lineTo(x + len, y);
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.moveTo(x + len, y);
+            ctx.lineTo(x + len - 5, y - 5);
+            ctx.lineTo(x + len - 5, y + 5);
+            ctx.fill();
+            
+            ctx.font = "italic 14px serif";
+            ctx.fillText(label, x + len/2 - 8, y - 6);
+            ctx.font = "italic 10px serif";
+            ctx.fillText(sub, x + len/2 + 2, y - 2);
+        }
+
+        function drawGraph() {
+            gCtx.clearRect(0, 0, gCanvas.width, gCanvas.height);
+            const margin = 35;
+            const w = gCanvas.width - margin * 1.5;
+            const h = gCanvas.height - margin * 1.5;
+
+            const showA = document.getElementById('showGraphA').checked;
+            const showB = document.getElementById('showGraphB').checked;
+
+            gCtx.strokeStyle = "#475569";
+            gCtx.lineWidth = 1.5;
+            gCtx.beginPath();
+            gCtx.moveTo(margin, 10);
+            gCtx.lineTo(margin, h + margin);
+            gCtx.lineTo(w + margin, h + margin);
+            gCtx.stroke();
+
+            gCtx.fillStyle = "#1e293b";
+            gCtx.font = "italic 14px serif";
+            gCtx.fillText("v", margin - 15, 20);
+            gCtx.fillText("t", w + margin + 5, h + margin + 5);
+
+            const maxT = 6;
+            const maxV = Math.max(v0 * 1.2, 2.0);
+
+            // 縦軸にv0の目盛りを描画
+            const v0Y = h + margin - (v0 / maxV) * h;
+            gCtx.save();
+            gCtx.setLineDash([4, 4]);
+            gCtx.strokeStyle = "#cbd5e1";
+            gCtx.beginPath();
+            gCtx.moveTo(margin, v0Y);
+            gCtx.lineTo(w + margin, v0Y);
+            gCtx.stroke();
+            gCtx.restore();
+
+            gCtx.fillStyle = "#475569";
+            gCtx.font = "11px sans-serif";
+            gCtx.textAlign = "right";
+            gCtx.fillText(v0.toFixed(1), margin - 5, v0Y + 4);
+
+            if (state.history.length < 2) return;
+
+            if (showA) {
+                gCtx.strokeStyle = "#2563eb";
+                gCtx.lineWidth = 2;
+                gCtx.beginPath();
+                state.history.forEach((d, i) => {
+                    const tx = margin + (d.t / maxT) * w;
+                    const ty = h + margin - (d.va / maxV) * h;
+                    if (i === 0) gCtx.moveTo(tx, ty); else gCtx.lineTo(tx, ty);
+                });
+                gCtx.stroke();
+            }
+
+            if (showB) {
+                gCtx.strokeStyle = "#ea580c";
+                gCtx.lineWidth = 2;
+                gCtx.beginPath();
+                state.history.forEach((d, i) => {
+                    const tx = margin + (d.t / maxT) * w;
+                    const ty = h + margin - (d.vb / maxV) * h;
+                    if (i === 0) gCtx.moveTo(tx, ty); else gCtx.lineTo(tx, ty);
+                });
+                gCtx.stroke();
+            }
+
+            const legendX = w + margin - 80;
+            const legendY = 20;
+            gCtx.font = "12px sans-serif";
+            gCtx.textAlign = "left";
+            if (showA) {
+                gCtx.fillStyle = "#2563eb";
+                gCtx.fillRect(legendX, legendY, 10, 10);
+                gCtx.fillStyle = "#334155";
+                gCtx.fillText("物体A", legendX + 15, legendY + 10);
+            }
+            if (showB) {
+                gCtx.fillStyle = "#ea580c";
+                gCtx.fillRect(legendX, legendY + 15, 10, 10);
+                gCtx.fillStyle = "#334155";
+                gCtx.fillText("物体B", legendX + 15, legendY + 25);
+            }
+        }
+
+        function update() {
+            if (!isRunning) return;
+
+            const dt = 1/60;
+            time += dt;
+
+            const isAOnB = (state.xa >= state.xb && state.xa < state.xb + config.wb);
+            const relativeV = state.va - state.vb;
+
+            if (isAOnB && relativeV > 0.02) {
+                const accA = -mu * g;
+                const accB = (mu * mA * g) / mB;
+                state.va += accA * dt;
+                state.vb += accB * dt;
+            } else if (isAOnB && relativeV <= 0.02) {
+                const totalMomentum = mA * v0;
+                const commonV = totalMomentum / (mA + mB);
+                state.va = commonV;
+                state.vb = commonV;
+            }
+
+            state.xa += state.va * config.pixelsPerMeter * dt;
+            state.xb += state.vb * config.pixelsPerMeter * dt;
+
+            if (time < 10) {
+                state.history.push({t: time, va: state.va, vb: state.vb});
+            }
+
+            updateDisplay();
+            draw();
+
+            const hasFallen = (state.xa > state.xb + config.wb);
+            if (state.xa > canvas.width + 100 || (hasFallen && state.xa > config.stepX + 50)) {
+                isRunning = false;
+                document.getElementById('btnStart').innerText = "スタート";
+            } else {
+                animationId = requestAnimationFrame(update);
+            }
+        }
+
+        function updateDisplay() {
+            document.getElementById('valVa').innerText = Math.max(0, state.va).toFixed(2);
+            document.getElementById('valVb').innerText = state.vb.toFixed(2);
+            document.getElementById('labelV0Display').innerText = v0.toFixed(1);
+            document.getElementById('labelMassRatio').innerText = (mB/mA).toFixed(1);
+        }
+
+        document.getElementById('btnStart').addEventListener('click', () => {
+            if (animationId && !isRunning) {
+                isRunning = true;
+                document.getElementById('btnStart').innerText = "一時停止";
+                update();
+            } else if (isRunning) {
+                isRunning = false;
+                document.getElementById('btnStart').innerText = "スタート";
+            } else {
+                isRunning = true;
+                document.getElementById('btnStart').innerText = "一時停止";
+                update();
+            }
+        });
+
+        document.getElementById('btnReset').addEventListener('click', init);
+
+        document.getElementById('inputV0').addEventListener('input', (e) => {
+            v0 = parseFloat(e.target.value);
+            if (!isRunning && state.history.length === 0) {
+                state.va = v0;
+            }
+            updateDisplay();
+            draw();
+        });
+
+        document.getElementById('inputMassRatio').addEventListener('input', (e) => {
+            init();
+        });
+
+        document.getElementById('showGraphA').addEventListener('change', drawGraph);
+        document.getElementById('showGraphB').addEventListener('change', drawGraph);
+
+        window.onload = function() {
+            init();
+        };
+    </script>
+</body>
+</html>

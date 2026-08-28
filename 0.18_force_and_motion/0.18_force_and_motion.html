@@ -1,0 +1,444 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>物理シミュレーター：力と運動</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { touch-action: auto; overflow-y: auto; }
+        canvas { 
+            border: 2px solid #334155; 
+            border-radius: 8px; 
+            background-color: #f8fafc; 
+            cursor: grab; 
+            touch-action: none; /* キャンバス内のみスクロールを無効化 */
+        }
+        canvas.active { cursor: crosshair; }
+        canvas.dragging { cursor: grabbing; }
+        #countdown { 
+            position: absolute; 
+            top: 50%; 
+            left: 50%; 
+            transform: translate(-50%, -50%); 
+            font-size: 8rem; 
+            font-weight: bold; 
+            color: rgba(30, 41, 59, 0.5);
+            pointer-events: none;
+            display: none;
+        }
+    </style>
+</head>
+<body class="bg-slate-100 flex flex-col min-h-screen p-2 md:p-4">
+
+    <div class="max-w-4xl mx-auto w-full flex flex-col flex-grow space-y-3">
+        <header class="text-center">
+            <h1 class="text-2xl font-bold text-slate-800">力と運動</h1>
+            <p class="text-sm text-slate-600 mt-1">画面をクリック・タッチして、物体に力を加えてみよう</p>
+        </header>
+
+        <!-- コントロールパネル -->
+        <div class="bg-white p-3 rounded-xl shadow-md flex flex-col gap-3">
+            <div class="flex flex-wrap gap-3 items-center justify-between">
+                <div class="flex items-center gap-2">
+                    <label class="text-sm font-medium text-slate-700">方向制限:</label>
+                    <select id="forceMode" class="border border-slate-300 rounded px-2 py-1 text-sm outline-none focus:ring-2 focus:ring-blue-500 bg-white">
+                        <option value="all">制限なし</option>
+                        <option value="horizontal">左右のみ</option>
+                        <option value="vertical">上下のみ</option>
+                        <option value="const-up">上に一定の力</option>
+                        <option value="const-down">下に一定の力</option>
+                        <option value="const-right">右に一定の力</option>
+                        <option value="const-left">左に一定の力</option>
+                    </select>
+                </div>
+
+                <div class="flex items-center gap-4 flex-grow min-w-[250px]">
+                    <label class="text-sm font-medium text-slate-700 whitespace-nowrap">初速度(v<sub>x</sub>):</label>
+                    <input type="range" id="initVx" min="-10" max="10" step="0.5" value="0" class="flex-grow h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-blue-600">
+                    <span id="vxVal" class="text-sm font-mono w-8 text-right">0</span>
+                </div>
+
+                <div class="flex items-center gap-2">
+                    <input type="checkbox" id="showTrajectory" checked class="w-4 h-4 text-blue-600">
+                    <label for="showTrajectory" class="text-sm font-medium text-slate-700">軌道を表示</label>
+                </div>
+            </div>
+
+            <div class="flex justify-center gap-4 border-t pt-3 border-slate-100">
+                <button id="startBtn" class="bg-blue-600 hover:bg-blue-700 text-white px-8 py-2 rounded-lg font-bold transition min-w-[120px]">スタート</button>
+                <button id="resetBtn" class="bg-slate-500 hover:bg-slate-600 text-white px-8 py-2 rounded-lg font-bold transition">リセット</button>
+            </div>
+        </div>
+
+        <!-- キャンバスエリア -->
+        <div class="flex-grow relative min-h-[400px]">
+            <canvas id="canvas" class="w-full h-full shadow-inner"></canvas>
+            
+            <!-- カウントダウン表示 -->
+            <div id="countdown">5</div>
+        </div>
+
+        <!-- ナビゲーションボタンとコピーライト -->
+        <footer class="flex flex-col items-center gap-3 py-1">
+            <!-- 利用例テキストの追加 -->
+            <div class="max-w-full text-center px-4">
+                <p class="text-[11px] text-slate-600 leading-relaxed">
+                    【利用例】一定の力が加わったときの運動／水平投射／力積による力の向きの変化／等速円運動／等速円運動の向心力がなくなったときの物体の運動／単振動／J.J.トムソンの実験
+                </p>
+            </div>
+            
+            <!--//20260810 <div class="flex gap-4">
+                <a href="../6.0_home/home.html" class="bg-slate-700 hover:bg-slate-800 text-white px-4 py-2 rounded text-sm font-medium transition flex items-center gap-2">
+                    ホーム
+                </a>
+                <a href="../6.1_physics_home/physics_home.html" class="bg-slate-700 hover:bg-slate-800 text-white px-4 py-2 rounded text-sm font-medium transition flex items-center gap-2">
+                    物理一覧
+                </a>
+            </div> //20260810 -->
+            <div id="copyright" class="text-[10px] text-slate-500"></div>
+        </footer>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        const startBtn = document.getElementById('startBtn');
+        const resetBtn = document.getElementById('resetBtn');
+        const initVxInput = document.getElementById('initVx');
+        const vxValSpan = document.getElementById('vxVal');
+        const countdownEl = document.getElementById('countdown');
+        const forceModeSelect = document.getElementById('forceMode');
+        const showTrajectoryCheck = document.getElementById('showTrajectory');
+        const copyrightEl = document.getElementById('copyright');
+
+        // コピーライト設定
+        const currentYear = new Date().getFullYear();
+        copyrightEl.innerHTML = `Copyright &copy; 2021-${currentYear} T.Suzuki`;
+
+        // 定数・パラメータ
+        let running = false;
+        let isCountingDown = false;
+        let isDraggingBall = false;
+        let countdownTimer = null;
+        let trajectory = []; 
+        
+        // 運動開始時の位置を保持する変数
+        let startPos = { x: 0, y: 0 };
+        
+        const ball = {
+            x: 0,
+            y: 0,
+            vx: 0,
+            vy: 0,
+            ax: 0,
+            ay: 0,
+            radius: 12, 
+            mass: 1.0
+        };
+
+        let pointer = { x: 0, y: 0, active: false };
+        
+        const FORCE_SCALE = 0.015;  
+        const CONST_FORCE_VAL = 0.3; 
+        const ARROW_HEAD_SIZE = 8;
+        const TIME_STEP = 0.15; 
+
+        function init() {
+            resize();
+            // 初期の初期位置を設定
+            startPos.x = canvas.width / 4;
+            startPos.y = canvas.height / 2;
+            resetBall();
+            requestAnimationFrame(update);
+        }
+
+        function resize() {
+            const rect = canvas.parentElement.getBoundingClientRect();
+            canvas.width = rect.width;
+            canvas.height = rect.height;
+            if (!running && !isCountingDown && !isDraggingBall) {
+                // デフォルトの開始位置を再計算
+                startPos.x = canvas.width / 4;
+                startPos.y = canvas.height / 2;
+                resetBall();
+            }
+        }
+
+        // リセットボタン押下時に呼ばれる関数
+        function resetBall() {
+            // 前回の「スタート時点」の位置に戻す
+            ball.x = startPos.x;
+            ball.y = startPos.y;
+            ball.vx = parseFloat(initVxInput.value);
+            ball.vy = 0;
+            ball.ax = 0;
+            ball.ay = 0;
+            trajectory = []; 
+            forceModeSelect.disabled = false;
+            canvas.classList.remove('active');
+        }
+
+        function stopSimulation() {
+            running = false;
+            isCountingDown = false;
+            clearTimeout(countdownTimer);
+            countdownEl.style.display = 'none';
+            startBtn.disabled = false;
+            forceModeSelect.disabled = false;
+            startBtn.textContent = 'スタート';
+            startBtn.className = "bg-blue-600 hover:bg-blue-700 text-white px-8 py-2 rounded-lg font-bold transition min-w-[120px]";
+            canvas.classList.remove('active');
+        }
+
+        function startSimulation() {
+            running = true;
+            isCountingDown = false;
+            countdownEl.style.display = 'none';
+            startBtn.disabled = false;
+            startBtn.textContent = '一時停止';
+            startBtn.className = "bg-amber-500 hover:bg-amber-600 text-white px-8 py-2 rounded-lg font-bold transition min-w-[120px]";
+            canvas.classList.add('active');
+        }
+
+        function runCountdown(seconds) {
+            // カウントダウン開始時に現在の位置を「運動の始めの位置」として記憶
+            if (seconds === 5) {
+                startPos.x = ball.x;
+                startPos.y = ball.y;
+            }
+            
+            isCountingDown = true;
+            startBtn.disabled = true;
+            forceModeSelect.disabled = true;
+            startBtn.textContent = '待機中...';
+            countdownEl.style.display = 'block';
+            countdownEl.textContent = seconds;
+
+            if (seconds > 0) {
+                countdownTimer = setTimeout(() => runCountdown(seconds - 1), 1000);
+            } else {
+                startSimulation();
+            }
+        }
+
+        function drawArrow(x1, y1, x2, y2, color, label = "") {
+            const dx = x2 - x1;
+            const dy = y2 - y1;
+            const angle = Math.atan2(dy, dx);
+            const length = Math.sqrt(dx * dx + dy * dy);
+
+            if (length < 2) return;
+
+            ctx.beginPath();
+            ctx.strokeStyle = color;
+            ctx.lineWidth = 2;
+            ctx.moveTo(x1, y1);
+            ctx.lineTo(x2, y2);
+            ctx.stroke();
+
+            ctx.beginPath();
+            ctx.fillStyle = color;
+            ctx.moveTo(x2, y2);
+            ctx.lineTo(x2 - ARROW_HEAD_SIZE * Math.cos(angle - Math.PI / 6), y2 - ARROW_HEAD_SIZE * Math.sin(angle - Math.PI / 6));
+            ctx.lineTo(x2 - ARROW_HEAD_SIZE * Math.cos(angle + Math.PI / 6), y2 - ARROW_HEAD_SIZE * Math.sin(angle + Math.PI / 6));
+            ctx.closePath();
+            ctx.fill();
+
+            if (label) {
+                ctx.fillStyle = color;
+                ctx.font = "bold 10px sans-serif";
+                // 初速度が負（左向き）のとき、文字が先端と被らないように位置を調整
+                const offsetX = dx >= 0 ? 5 : -15;
+                const offsetY = dy >= 0 ? 5 : -5;
+                ctx.fillText(label, x2 + offsetX, y2 + offsetY);
+            }
+        }
+
+        function update() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // 背景のグリッド
+            ctx.strokeStyle = "#f1f5f9";
+            ctx.lineWidth = 1;
+            const gridSize = 40;
+            for(let x = 0; x < canvas.width; x += gridSize) {
+                ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, canvas.height); ctx.stroke();
+            }
+            for(let y = 0; y < canvas.height; y += gridSize) {
+                ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(canvas.width, y); ctx.stroke();
+            }
+
+            ball.ax = 0;
+            ball.ay = 0;
+
+            // --- 物理計算 ---
+            if (pointer.active && !isDraggingBall) {
+                const mode = forceModeSelect.value;
+                if (mode === 'all') {
+                    ball.ax = (pointer.x - ball.x) * FORCE_SCALE;
+                    ball.ay = (pointer.y - ball.y) * FORCE_SCALE;
+                } else if (mode === 'horizontal') {
+                    ball.ax = (pointer.x - ball.x) * FORCE_SCALE;
+                } else if (mode === 'vertical') {
+                    ball.ay = (pointer.y - ball.y) * FORCE_SCALE;
+                } else {
+                    if (mode === 'const-up') { ball.ay = -CONST_FORCE_VAL; }
+                    else if (mode === 'const-down') { ball.ay = CONST_FORCE_VAL; }
+                    else if (mode === 'const-right') { ball.ax = CONST_FORCE_VAL; }
+                    else if (mode === 'const-left') { ball.ax = -CONST_FORCE_VAL; }
+                }
+            }
+
+            if (running) {
+                ball.vx += ball.ax * TIME_STEP;
+                ball.vy += ball.ay * TIME_STEP;
+                ball.x += ball.vx;
+                ball.y += ball.vy;
+
+                if (showTrajectoryCheck.checked && (Math.abs(ball.vx) > 0.05 || Math.abs(ball.vy) > 0.05)) {
+                    if (trajectory.length === 0 || Math.hypot(ball.x - trajectory[trajectory.length-1].x, ball.y - trajectory[trajectory.length-1].y) > 10) {
+                        trajectory.push({x: ball.x, y: ball.y});
+                        if (trajectory.length > 800) trajectory.shift();
+                    }
+                }
+
+                if (
+                    ball.x + ball.radius < -50 || 
+                    ball.x - ball.radius > canvas.width + 50 || 
+                    ball.y + ball.radius < -50 || 
+                    ball.y - ball.radius > canvas.height + 50
+                ) {
+                    stopSimulation();
+                    resetBall();
+                }
+            }
+
+            // --- 描画順序: 軌道を最背面に ---
+            if (showTrajectoryCheck.checked) {
+                ctx.fillStyle = "rgba(251, 146, 60, 0.7)"; // Improved trajectory visibility (Orange)
+                trajectory.forEach(p => {
+                    ctx.beginPath();
+                    ctx.arc(p.x, p.y, 1.8, 0, Math.PI * 2);
+                    ctx.fill();
+                });
+            }
+
+            // --- 描画順序: 力の矢印を描画 ---
+            if (pointer.active && !isDraggingBall) {
+                const mode = forceModeSelect.value;
+                let drawX = pointer.x;
+                let drawY = pointer.y;
+
+                if (mode === 'all') {
+                    drawArrow(ball.x, ball.y, drawX, drawY, "#ef4444", "F");
+                } else if (mode === 'horizontal') {
+                    drawY = ball.y;
+                    drawArrow(ball.x, ball.y, drawX, drawY, "#ef4444", "F");
+                } else if (mode === 'vertical') {
+                    drawX = ball.x;
+                    drawArrow(ball.x, ball.y, drawX, drawY, "#ef4444", "F");
+                } else {
+                    if (mode === 'const-up') { drawX = ball.x; drawY = ball.y - 30; }
+                    else if (mode === 'const-down') { drawX = ball.x; drawY = ball.y + 30; }
+                    else if (mode === 'const-right') { drawX = ball.x + 30; drawY = ball.y; }
+                    else if (mode === 'const-left') { drawX = ball.x - 30; drawY = ball.y; }
+                    drawArrow(ball.x, ball.y, drawX, drawY, "#ef4444", "F");
+                }
+            }
+
+            // --- 描画順序: 速度の矢印を描画 ---
+            if (Math.abs(ball.vx) > 0.1 || Math.abs(ball.vy) > 0.1) {
+                drawArrow(ball.x, ball.y, ball.x + ball.vx * 10, ball.y + ball.vy * 10, "#3b82f6", "v");
+            }
+
+            // --- 描画順序: 物体を最前面に ---
+            ctx.beginPath();
+            ctx.arc(ball.x, ball.y, ball.radius, 0, Math.PI * 2);
+            ctx.fillStyle = isDraggingBall ? "#475569" : "#1e293b";
+            ctx.shadowBlur = 8;
+            ctx.shadowColor = "rgba(0,0,0,0.2)";
+            ctx.fill();
+            ctx.shadowBlur = 0;
+
+            requestAnimationFrame(update);
+        }
+
+        startBtn.addEventListener('click', () => {
+            if (running) {
+                stopSimulation();
+            } else {
+                runCountdown(5);
+            }
+        });
+
+        resetBtn.addEventListener('click', () => {
+            stopSimulation();
+            resetBall(); 
+        });
+
+        initVxInput.addEventListener('input', (e) => {
+            vxValSpan.textContent = e.target.value;
+            if (!running && !isCountingDown) ball.vx = parseFloat(e.target.value);
+        });
+
+        function handlePointerDown(e) {
+            updatePointerPos(e);
+            if (!running && !isCountingDown) {
+                const dist = Math.hypot(pointer.x - ball.x, pointer.y - ball.y);
+                if (dist < ball.radius * 3) { 
+                    isDraggingBall = true;
+                    canvas.classList.add('dragging');
+                    return;
+                }
+            }
+            pointer.active = true;
+        }
+
+        function handlePointerMove(e) {
+            updatePointerPos(e);
+            if (isDraggingBall) {
+                ball.x = pointer.x;
+                ball.y = pointer.y;
+            }
+        }
+
+        function handlePointerUp() {
+            pointer.active = false;
+            isDraggingBall = false;
+            canvas.classList.remove('dragging');
+        }
+
+        function updatePointerPos(e) {
+            const rect = canvas.getBoundingClientRect();
+            const clientX = (e.touches && e.touches.length > 0) ? e.touches[0].clientX : e.clientX;
+            const clientY = (e.touches && e.touches.length > 0) ? e.touches[0].clientY : e.clientY;
+            pointer.x = clientX - rect.left;
+            pointer.y = clientY - rect.top;
+        }
+
+        canvas.addEventListener('mousedown', handlePointerDown);
+        window.addEventListener('mousemove', handlePointerMove);
+        window.addEventListener('mouseup', handlePointerUp);
+
+        canvas.addEventListener('touchstart', (e) => { 
+            // 物理シミュレーション操作中（ポインタアクティブ）はデフォルトの動作（スクロール）を抑制
+            if (pointer.active || isDraggingBall) {
+                if (e.cancelable) e.preventDefault();
+            }
+            handlePointerDown(e); 
+        }, { passive: false });
+        window.addEventListener('touchmove', (e) => { 
+            if (pointer.active || isDraggingBall) {
+                if (e.cancelable) e.preventDefault();
+            }
+            handlePointerMove(e); 
+        }, { passive: false });
+        window.addEventListener('touchend', handlePointerUp);
+
+        window.addEventListener('resize', resize);
+
+        init();
+    </script>
+</body>
+</html>

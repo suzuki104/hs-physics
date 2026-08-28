@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta charset="utf-8" />
+  <title>モンキーハンティング｜高校理科・数学のデジタル教材</title>
+  <!--<style>
+    canvas {
+      background: #eee;
+
+      display: block;
+      margin: 0 auto;
+    }*/
+  </style>-->
+      <!--<link rel='stylesheet' href='../css/reset/reset.css'>-->
+      <link rel='stylesheet' href='../css/1.1_canvas/canvas.css'>
+      <link rel='stylesheet' href='monky_hunting.css'>
+      <!-- Global site tag (gtag.js) - Google Analytics -->
+      <script async src="https://www.googletagmanager.com/gtag/js?id=G-Q504YP8BNR"></script>
+      <script>
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+
+        gtag('config', 'G-Q504YP8BNR');
+      </script>
+
+</head>
+
+<body>
+<div class='canvas_body'>
+  <h1 class="canvas_title"> モンキーハンティング </h1>
+    初期位置と初速度をスライダーより選択<br>
+<div class='table'>
+<table border="1">
+<tr><!--0-->
+  <td colspan="4">
+    パラメータ入力欄
+  </td>
+</tr>
+<tr><!--1-->
+  <td colspan="2">
+  </td>
+  <td>
+    左右<!--x軸-->
+  </td>
+  <td>
+    高さ<!--y軸-->
+  </td>
+</tr>
+<tr><!--2-->
+  <td rowspan="2">
+    初期位置
+  </td>
+  <td bgcolor='red'>
+    赤球
+  </td>
+  <td height='80'><!--赤球x軸初期位置-->
+      &nbsp;左<input type='range' id='x1pos' name= 'x1pos' value='10' min='1' max='500'>右&nbsp;
+  </td>
+  <td><!--赤球y軸初期位置-->
+  &nbsp;高<input type='range' id='y1pos' name= 'y1pos' value='490' min='1' max='500'>低&nbsp;
+  </td>
+</tr>
+<tr><!--3-->
+  <td bgcolor='skyblue'>
+    青球
+  </td>
+  <td height='80'><!--青球x軸初期位置-->
+    &nbsp;左<input type='range' id='x2pos' name= 'x2pos' value='450' min='1' max='500'>右&nbsp;
+  </td>
+  <td><!--青球y軸初期位置-->
+    &nbsp;高<input type='range' id='y2pos' name= 'y2pos' value='10' min='1' max='500'>低&nbsp;
+  </td>
+</tr>
+<tr><!--4-->
+  <td colspan="2">
+    初速度（赤球）
+  </td>
+  <td colspan="2" height='80'><!--赤球初速度-->
+    遅<input type='range' id='i_velocity' name= 'i_velocity' value='250' min='1' max='500'>速 <!--初速度最大値設定したのは特に意味はない-->
+  </td>
+</tr>
+
+</table>
+</div><br> <!--table-->
+<!--
+＜赤ボール（斜方投射）＞<br>
+  <label for='i_velocity'>初速度：</label>
+ <input type='number' id='i_velocity' name= 'i_velocity' value='100' min='0'> <br>
+<label for='x1pos'>初期位置：x軸</label>
+  <input type='number' id='x1pos' name= 'x1pos' value='10' min='0' max='500'>
+  <label for= 'y1pos'>&nbsp;y軸 </label>
+  <input type='number' id='y1pos' name= 'y1pos' value='490' min='0' max='500'>
+  <br><br>
+  ＜青ボール（自由落下）＞<br>
+  <label for='x2pos'>初期位置：x軸</label>
+    <input type='number' id='x2pos' name= 'x2pos' value='450' min='0' max='500'>
+    <label for= 'y2pos'>&nbsp;y軸 </label>
+    <input type='number' id='y2pos' name= 'y2pos' value='10' min='0' max='500'>
+    <br>
+  <br>
+-->
+
+<!--  <button id='setting'> 設定</button>-->
+  <button id='start'> スタート</button>
+  <button id ='stop'> ストップ</button>
+  <button id ='reset'>リセット</button>
+<!--  <div id='text-button'>
+    <p id='text'>スタート</p>
+  </div> -->
+  <canvas id='myCanvas' width='500' height='500'></canvas>
+  <script src='./monky_hunting.js'> </script>
+
+  <a href='manual/monky_hunting_manual.html' target='_blank' rel='noopener noreferrer'><div class='button'>使用方法</div></a>
+  <a href='../6.0_home/home.html'><div class='button'>ホーム</div></a>
+  <a href='../6.1_physics_home/physics_home.html'><div class='button'>物理一覧</div></a>
+  <br>
+<!--  ＜使い方・備考＞<br>
+〜木から落ちる猿に向けて銃弾を打つと，必ず猿を撃てる〜<br><br>
+  ・赤ボールの初速度と初期位置，青ボールの初期位置の値を入力後，「設定」ボタンをクリック<br>
+  ・赤ボールは銃弾，青ボールはサルを想定<br>
+  ・初速度の向きは赤ボールから青ボールに向かう向き（赤色の矢印が初速度の向きを表している）<br>
+  ・赤ボールが青ボールと一致すると「HIT!!」と表示される<br>
+  ・原点の位置，x軸・y軸の向きに注意<br>
+<br>
+  ※衝突条件は「青球と赤球の中心座標のx, y座標がそれぞれ1ピクセル未満のとき
+  （全体では500×500ピクセル）」としているため，
+  複数回衝突が表示されたり，「HIT!!」と表示されずに素通りする可能性があります．
+  改善するかもしれません．<br>
+  ※不具合，改善要望などありましたらご連絡ください．
+<br><br>
+</div>--> <!--canvas_body-->
+
+<!--<script>
+console.log('表示完了');
+console.error();
+
+</script>-->
+
+</body>
+
+
+</html>

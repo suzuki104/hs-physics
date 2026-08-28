@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta charset="utf-8" />
+  <title>モンキーハンティング</title>
+  <style>
+    * {
+
+      padding: 0;
+      margin: 0;
+    }
+
+    canvas {
+      background: #eee;
+
+      display: block;
+      margin: 0 auto;
+    }
+  </style>
+</head>
+
+<body>
+
+  <h1> モンキーハンティング </h1>
+<p>数値は半角で入力すること（全角では反応しない）</p>
+<br>
+＜赤ボール（斜方投射）＞<br>
+  <label for='v0'>初速度：</label>
+ <input type='number' id='v0' name= 'v0' value='100'> <br>
+<label for='x1pos'>初期位置：x軸</label>
+  <input type='number' id='x1pos' name= 'x1pos' value='10'>
+  <label for= 'y1pos'>&nbsp;y軸 </label>
+  <input type='number' id='y1pos' name= 'y1pos' value='500'>
+  <br><br>
+  ＜青ボール（自由落下）＞<br>
+  <label for='x2pos'>初期位置：x軸</label>
+    <input type='number' id='x2pos' name= 'x2pos' value='400'>
+    <label for= 'y2pos'>&nbsp;y軸 </label>
+    <input type='number' id='y2pos' name= 'y2pos' value='0'>
+    <br>
+  <br>
+
+
+  <button id='start'> スタート</button>
+  <button id ='stop2'> ストップ</button>
+  <button id ='reset'>リセット</button>
+<br><br>
+<!--  <div id='text-button'>
+    <p id='text'>スタート</p>
+  </div> -->
+  <canvas id='myCanvas' width='500' height='500'></canvas>
+  <script src='./monky_hunting.js'> </script>
+
+<script>
+console.log('表示完了');
+console.error();
+
+</script>
+
+</body>
+
+
+</html>

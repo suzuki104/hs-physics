@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8"/>
+  <title>等加速度直線運動｜高校理科・数学のデジタル教材</title>
+<!--  <style>
+    * {padding: 0; margin: 0;}
+    canvas{background: #eee; display: block; margin: 0 auto;}
+</style>-->
+  <link rel='stylesheet' href='../css/1.1_canvas/canvas.css'>
+  <link rel='stylesheet' href='0.5_acceleration_motion.css'>
+
+  <!-- Global site tag (gtag.js) - Google Analytics -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-Q504YP8BNR"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+
+    gtag('config', 'G-Q504YP8BNR');
+  </script>
+
+</head>
+<body>
+  <div class='canvas_body'>
+    <h1 class="canvas_title">等加速度直線運動</h1>
+
+    <div class='table'>
+    <table border="1"><!--rules="groups"-->
+      <thead>
+      <tr>
+        <td colspan = '3'>
+          表示・非表示の設定
+        </td>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>
+          図
+        </td>
+        <td>
+          x-tグラフ
+        </td>
+        <td>
+          v-tグラフ
+        </td>
+      </tr>
+    </tbody>
+      <tr>
+        <td>
+          <input type='checkbox' id='strobe' checked><label for='strobe'>ストロボ表示</label><br>
+          <input type='checkbox' id='xvector1'><label for='xvector1'>変位ベクトル</label><br>
+          <input type='checkbox' id='vvector1'><label for='vvector1'>速度ベクトル</label><br>
+          <input type='checkbox' id='avector1'><label for='avector1'>加速度ベクトル</label>
+        </td>
+        <td>
+          <input type='checkbox' id='graph1' checked><label for='graph1'>x-tグラフ</label><br>
+          <input type='checkbox' id='xvector2'><label for='xvector2'>変位ベクトル</label><br>
+        </td>
+        <td>
+          <input type='checkbox' id='graph2' checked><label for='graph2'>v-tグラフ</label><br>
+          <input type='checkbox' id='vvector2'><label for='vvector2'>速度ベクトル</label><br>
+        </td>
+      </tr>
+    </table>
+    </div>
+<br>
+
+    初速度 v<sub>0</sub>[m/s]：
+     <select id='velocity' class="selectbox">
+       <option value='0'>0</option>
+       <option value='0.2'>1</option>
+       <option value='0.4'>2</option>
+       <option value='0.6'>3</option>
+       <option value='0.8'>4</option>
+       <option value='1' selected>5</option>
+       <option value='2'>10</option>
+       <option value='3'>15</option>
+     </select>
+     &nbsp; &nbsp;
+   加速度 a[m/s<sup>2</sup>]：
+    <select id='acceleration' class="selectbox">
+      <option value='-3'>-3</option>
+      <option value='-2'>-2</option>
+      <option value='-1'>-1</option>
+      <option value='-0.50'>-0.5</option>
+      <option value='-0.25'>-0.25</option>
+      <option value='0'>0</option>
+      <option value='0.25'>0.25</option>
+      <option value='0.50'>0.5</option>
+      <option value='1' selected>1</option>
+      <option value='2'>2</option>
+      <option value='3'>3</option>
+    </select><br>
+
+    <button id='start'>スタート</button>
+    <button id='stop'>ストップ</button>
+    <button id='reset'>リセット</button>
+
+
+<canvas id='myCanvas' width='1000' height='800'></canvas>
+<script src='./0.5_acceleration_motion.js'></script>
+
+<!--<span id='function1' class="display_function">ここに設定した関数が表示されます(x-tグラフの式)</span>
+<span id='function2' class="display_function">ここに設定した関数が表示されます(v-tグラフの式)</span>-->
+<br>
+
+ <!--加速度
+  <select id='acceleration'>
+    <option value='-2'>-2</option>
+    <option value='-1'>-1</option>
+    <option value='0'>0</option>
+    <option value='0.50'>0.5</option>
+    <option value='1' selected>1</option>
+    <option value='2'>2</option>
+    <option value='3'>3</option>
+    <option value='4'>4</option>
+  </select><br>
+-->
+<a href='../6.0_home/home.html'><div class='button'>ホーム</div></a>
+<a href='../6.1_physics_home/physics_home.html'><div class='button'>物理一覧</div></a>
+<br>
+
+
+</body>
+
+</html>

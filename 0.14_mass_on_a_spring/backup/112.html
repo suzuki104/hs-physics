@@ -1,0 +1,416 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ばねと物体の落下運動</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            background-color: #f8fafc;
+            font-family: 'Helvetica Neue', Arial, sans-serif;
+        }
+        canvas {
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+            touch-action: none;
+        }
+        .control-panel {
+            background: rgba(255, 255, 255, 0.9);
+            backdrop-filter: blur(4px);
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col items-center p-4">
+
+    <h1 class="text-3xl font-bold text-slate-800 mb-6">ばねと物体の落下運動</h1>
+
+    <div class="w-full max-w-7xl grid grid-cols-1 lg:grid-cols-4 gap-6 mb-8">
+        
+        <!-- Controls & Data (Left Side) -->
+        <div class="control-panel p-6 border border-slate-200 rounded-xl shadow-sm flex flex-col gap-6 text-sm lg:col-span-1">
+            <div class="flex flex-col gap-4">
+                <button id="playPauseBtn" class="w-full px-6 py-3 bg-blue-600 text-white rounded-full hover:bg-blue-700 transition shadow-md font-bold">落下開始 / 一時停止</button>
+                <button id="resetBtn" class="w-full px-6 py-3 bg-slate-600 text-white rounded-full hover:bg-slate-700 transition shadow-md font-bold">リセット</button>
+            </div>
+
+            <!-- Simulation Canvas -->
+            <div class="flex flex-col items-center">
+                <canvas id="simCanvas" width="240" height="240" class="w-full h-auto border border-slate-200"></canvas>
+            </div>
+
+            <!-- Graph Visibility Settings -->
+            <div class="bg-slate-50 p-4 rounded-lg border border-slate-200">
+                <p class="font-bold mb-2 text-xs text-slate-700">グラフ表示設定</p>
+                <div class="flex flex-col gap-2">
+                    <label class="flex items-center gap-2 cursor-pointer">
+                        <input type="checkbox" id="showTopGraph" checked class="w-4 h-4 accent-blue-600">
+                        <span class="text-xs text-blue-700 font-medium">ばね上端 (Blue)</span>
+                    </label>
+                    <label class="flex items-center gap-2 cursor-pointer">
+                        <input type="checkbox" id="showObjGraph" checked class="w-4 h-4 accent-red-600">
+                        <span class="text-xs text-red-700 font-medium">おもり (Red)</span>
+                    </label>
+                </div>
+            </div>
+
+            <!-- Real-time Data Display -->
+            <div class="bg-white p-4 rounded-lg border border-slate-200 shadow-inner flex flex-col gap-3 font-mono text-xs">
+                <div>
+                    <p class="font-bold border-b mb-1">ばね上端 (Blue)</p>
+                    <div class="flex justify-between text-blue-600"><span>変位 y₁:</span><span id="y1Val">0.00</span> m</div>
+                    <div class="flex justify-between text-blue-600"><span>速度 v₁:</span><span id="v1Val">0.00</span> m/s</div>
+                    <div class="flex justify-between text-blue-600"><span>加速 a₁:</span><span id="a1Val">0.00</span> m/s²</div>
+                </div>
+                <div>
+                    <p class="font-bold border-b mb-1">おもり (Red)</p>
+                    <div class="flex justify-between text-red-600"><span>変位 y₂:</span><span id="y2Val">0.0000</span> m</div>
+                    <div class="flex justify-between text-red-600"><span>速度 v₂:</span><span id="v2Val">0.0000</span> m/s</div>
+                    <div class="flex justify-between text-red-600"><span>加速 a₂:</span><span id="a2Val">0.00</span> m/s²</div>
+                </div>
+                <div class="pt-2 border-t flex justify-between text-slate-600">
+                    <span>経過時間:</span><span id="timeVal">0.00</span> s
+                </div>
+            </div>
+
+            <hr>
+            <div>
+                <label class="block font-bold mb-1 text-slate-700 text-xs">再生速度: <span id="speedVal">0.10</span>x</label>
+                <input type="range" id="speedInput" min="0.01" max="1.0" step="0.01" value="0.10" class="w-full">
+            </div>
+            <div>
+                <label class="block font-bold mb-1 text-slate-700 text-xs">ばね定数 (k): <span id="kVal">20</span> N/m</label>
+                <input type="range" id="kInput" min="5" max="50" value="20" class="w-full">
+            </div>
+            <div>
+                <label class="block font-bold mb-1 text-slate-700 text-xs">質量 (m): <span id="mVal">10.0</span> kg</label>
+                <input type="range" id="mInput" min="0.5" max="50.0" step="0.5" value="10.0" class="w-full">
+            </div>
+        </div>
+
+        <!-- Graph Canvases (Stacked) -->
+        <div class="lg:col-span-3 flex flex-col gap-4">
+            <div class="relative">
+                <canvas id="graphCanvas" width="800" height="700" class="w-full h-auto border border-slate-200"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <footer class="w-full max-w-4xl mt-auto pt-8 border-t border-slate-200 flex flex-col items-center gap-4">
+        <div class="flex gap-4">
+            <a href="../6.0_home/home.html" class="px-6 py-2 bg-white border border-slate-300 text-slate-700 rounded-md hover:bg-slate-50 transition shadow-sm">ホーム</a>
+            <a href="../6.1_physics_home/physics_home.html" class="px-6 py-2 bg-white border border-slate-300 text-slate-700 rounded-md hover:bg-slate-50 transition shadow-sm">物理一覧</a>
+        </div>
+        <p class="text-slate-500 text-xs mb-4" id="copyright"></p>
+    </footer>
+
+    <script>
+        document.getElementById('copyright').innerHTML = `Copyright &copy; 2021-${new Date().getFullYear()} T.Suzuki`;
+
+        const canvas = document.getElementById('simCanvas');
+        const ctx = canvas.getContext('2d');
+        const graphCanvas = document.getElementById('graphCanvas');
+        const gctx = graphCanvas.getContext('2d');
+        
+        const y1Display = document.getElementById('y1Val');
+        const v1Display = document.getElementById('v1Val');
+        const a1Display = document.getElementById('a1Val');
+        const y2Display = document.getElementById('y2Val');
+        const v2Display = document.getElementById('v2Val');
+        const a2Display = document.getElementById('a2Val');
+        const timeDisplay = document.getElementById('timeVal');
+
+        const showTopGraph = document.getElementById('showTopGraph');
+        const showObjGraph = document.getElementById('showObjGraph');
+
+        // Physics constants
+        let k = 20;        
+        let m = 10.0;       
+        let simSpeed = 0.1; 
+        const m_spring = 0.2; 
+        const g = 9.8;     
+        const ppi = 40;    
+        
+        const ceilingY_m = 0.8; 
+        const naturalLength_m = 1.0; 
+        const fallLimit_m = 50; 
+        
+        // State variables
+        let springTopY = ceilingY_m; 
+        let objectY = ceilingY_m + naturalLength_m + (10.0 * g / 20); 
+        let v_top = 0, v_obj = 0;    
+        let a_top = 0, a_obj = 0;
+        let isRunning = false, isAttached = true, isLatched = false;
+        let lastTime = 0, elapsedSimTime = 0;
+        let maxTimeOnGraph = 1.0; 
+        
+        // Graph data
+        let history = []; 
+
+        const kInput = document.getElementById('kInput');
+        const mInput = document.getElementById('mInput');
+        const speedInput = document.getElementById('speedInput');
+        const kVal = document.getElementById('kVal');
+        const mVal = document.getElementById('mVal');
+        const speedVal = document.getElementById('speedVal');
+        const playPauseBtn = document.getElementById('playPauseBtn');
+        const resetBtn = document.getElementById('resetBtn');
+
+        function calculateLatchTime() {
+            const omega = Math.sqrt(k * (1/m + 1/m_spring));
+            const t_latch = Math.PI / (2 * omega);
+            // グラフの横軸を固定するための時間を計算
+            return Math.max(0.5, t_latch * 1.2);
+        }
+
+        function updateEquilibrium() {
+            if (isAttached) {
+                springTopY = ceilingY_m;
+                objectY = ceilingY_m + naturalLength_m + (m * g / k);
+                v_top = 0; v_obj = 0;
+                a_top = 0; a_obj = 0;
+                elapsedSimTime = 0;
+                history = [];
+                isLatched = false;
+                maxTimeOnGraph = calculateLatchTime();
+                updateValueDisplay();
+            }
+        }
+
+        function updateValueDisplay() {
+            y1Display.innerText = Math.max(0, (springTopY - ceilingY_m)).toFixed(2);
+            v1Display.innerText = v_top.toFixed(2);
+            a1Display.innerText = a_top.toFixed(2);
+            // おもりの変位と速度を小数点第4位まで表示
+            y2Display.innerText = Math.max(0, (objectY - ceilingY_m)).toFixed(4);
+            v2Display.innerText = v_obj.toFixed(4);
+            a2Display.innerText = a_obj.toFixed(2);
+            timeDisplay.innerText = elapsedSimTime.toFixed(2);
+        }
+
+        kInput.addEventListener('input', (e) => { k = parseFloat(e.target.value); kVal.innerText = k; updateEquilibrium(); });
+        mInput.addEventListener('input', (e) => { m = parseFloat(e.target.value); mVal.innerText = m.toFixed(1); updateEquilibrium(); });
+        speedInput.addEventListener('input', (e) => { 
+            simSpeed = parseFloat(e.target.value); 
+            speedVal.innerText = simSpeed.toFixed(2); 
+        });
+        
+        playPauseBtn.addEventListener('click', () => { 
+            isRunning = !isRunning; 
+            if (isRunning) isAttached = false; 
+        });
+        
+        resetBtn.addEventListener('click', () => {
+            isAttached = true;
+            isLatched = false;
+            isRunning = false;
+            updateEquilibrium();
+            draw();
+        });
+
+        function drawSpring(yTop, yBottom) {
+            const coils = 20;
+            const width = 10;
+            const length = yBottom - yTop;
+            const centerX = canvas.width / 2;
+            ctx.beginPath();
+            ctx.strokeStyle = '#64748b';
+            ctx.lineWidth = 1.5;
+            ctx.moveTo(centerX, yTop);
+            for (let i = 0; i <= coils; i++) {
+                const fraction = i / coils;
+                const currY = yTop + fraction * length;
+                const currX = centerX + (i % 2 === 0 ? width : -width) * (i === 0 || i === coils ? 0 : 1);
+                ctx.lineTo(currX, currY);
+            }
+            ctx.stroke();
+        }
+
+        function drawPlot(ctx, data, property, scaleT, scaleY, offsetT, offsetY, color, padding, maxT) {
+            ctx.beginPath();
+            ctx.strokeStyle = color;
+            ctx.lineWidth = 2;
+            data.forEach((point, i) => {
+                // maxT を超えるデータは描画しない（軸の外に出さない）
+                if (point.t > maxT) return;
+                const x = padding + point.t * scaleT;
+                const y = offsetY - point[property] * scaleY;
+                if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+            });
+            ctx.stroke();
+        }
+
+        function drawGraph() {
+            gctx.clearRect(0, 0, graphCanvas.width, graphCanvas.height);
+            const padding = 50;
+            const gWidth = graphCanvas.width - padding * 2;
+            const paneHeight = (graphCanvas.height - padding * 4) / 3;
+
+            // 横軸の時間を固定（経過時間によって伸縮させない）
+            const maxT = maxTimeOnGraph;
+            const scaleT = gWidth / maxT;
+
+            const panes = [
+                { title: "変位 y (m)", key: "y", colors: ["#3b82f6", "#ef4444"], propNames: ["dy_top", "dy_obj"] },
+                { title: "速度 v (m/s)", key: "v", colors: ["#3b82f6", "#ef4444"], propNames: ["v_top", "v_obj"] },
+                { title: "加速度 a (m/s²)", key: "a", colors: ["#3b82f6", "#ef4444"], propNames: ["a_top", "a_obj"] }
+            ];
+
+            panes.forEach((pane, idx) => {
+                const yOffset = padding + paneHeight * (idx + 1) + padding * idx;
+                const bottomY = yOffset;
+                const topY = yOffset - paneHeight;
+
+                // Axes
+                gctx.strokeStyle = '#334155';
+                gctx.lineWidth = 1;
+                gctx.beginPath();
+                gctx.moveTo(padding, topY);
+                gctx.lineTo(padding, bottomY);
+                gctx.lineTo(graphCanvas.width - padding, bottomY);
+                gctx.stroke();
+
+                gctx.fillStyle = '#334155';
+                gctx.font = 'bold 12px Arial';
+                gctx.textAlign = 'left';
+                gctx.fillText(pane.title, padding, topY - 10);
+
+                // Time labels on the last pane
+                if (idx === 2) {
+                    gctx.textAlign = 'center';
+                    gctx.fillText("0", padding, bottomY + 15);
+                    gctx.fillText(maxT.toFixed(2) + " s", graphCanvas.width - padding, bottomY + 15);
+                }
+
+                if (history.length < 1) return;
+
+                // Scale calculation - considering visibility and data within maxT
+                const activeValues = [];
+                const visibleHistory = history.filter(p => p.t <= maxT);
+                if (visibleHistory.length === 0) return;
+
+                if (showTopGraph.checked) activeValues.push(...visibleHistory.map(p => p[pane.propNames[0]]));
+                if (showObjGraph.checked) activeValues.push(...visibleHistory.map(p => p[pane.propNames[1]]));
+
+                if (activeValues.length === 0) return;
+
+                let minV = Math.min(0, ...activeValues);
+                let maxV = Math.max(0.1, ...activeValues);
+                const range = maxV - minV;
+                const scaleY = paneHeight / (range * 1.1);
+                const baselineY = bottomY + minV * scaleY;
+
+                // Labels
+                gctx.font = '10px Arial';
+                gctx.textAlign = 'right';
+                gctx.fillText(maxV.toFixed(1), padding - 5, bottomY - (maxV - minV) * scaleY);
+                gctx.fillText(minV.toFixed(1), padding - 5, bottomY);
+
+                // Zero line
+                if (minV < 0 && maxV > 0) {
+                    gctx.setLineDash([5, 5]);
+                    gctx.beginPath();
+                    gctx.moveTo(padding, baselineY);
+                    gctx.lineTo(graphCanvas.width - padding, baselineY);
+                    gctx.stroke();
+                    gctx.setLineDash([]);
+                }
+
+                // Plotting based on checkbox state
+                if (showTopGraph.checked) {
+                    drawPlot(gctx, history, pane.propNames[0], scaleT, scaleY, padding, baselineY, pane.colors[0], padding, maxT);
+                }
+                if (showObjGraph.checked) {
+                    drawPlot(gctx, history, pane.propNames[1], scaleT, scaleY, padding, baselineY, pane.colors[1], padding, maxT);
+                }
+            });
+        }
+
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            const drawTopY = springTopY * ppi;
+            const drawObjY = objectY * ppi;
+            const centerX = canvas.width / 2;
+
+            ctx.fillStyle = '#334155';
+            ctx.fillRect(centerX - 30, (ceilingY_m * ppi) - 5, 60, 5);
+
+            drawSpring(drawTopY, drawObjY);
+
+            ctx.beginPath();
+            ctx.arc(centerX, drawObjY, 12, 0, Math.PI * 2);
+            ctx.fillStyle = isLatched ? '#10b981' : '#ef4444';
+            ctx.fill();
+            
+            ctx.beginPath();
+            ctx.arc(centerX, drawTopY, 4, 0, Math.PI * 2);
+            ctx.fillStyle = '#3b82f6';
+            ctx.fill();
+
+            drawGraph();
+        }
+
+        function update(timestamp) {
+            if (isRunning && !isAttached) {
+                const dt = Math.min((timestamp - lastTime) / 1000, 0.02) * simSpeed;
+                elapsedSimTime += dt;
+                
+                const currentLength = objectY - springTopY;
+                
+                if (!isLatched && currentLength <= naturalLength_m) {
+                    isLatched = true;
+                    const v_center = (m * v_obj + m_spring * v_top) / (m + m_spring);
+                    v_obj = v_center;
+                    v_top = v_center;
+                    objectY = springTopY + naturalLength_m;
+                }
+
+                if (isLatched) {
+                    a_obj = g;
+                    a_top = g;
+                    v_obj += a_obj * dt;
+                    v_top += a_top * dt;
+                    objectY += v_obj * dt;
+                    springTopY += v_top * dt;
+                } else {
+                    const stretch = currentLength - naturalLength_m;
+                    const springForce = k * stretch;
+
+                    a_obj = g - (springForce / m);
+                    v_obj += a_obj * dt;
+                    objectY += v_obj * dt;
+
+                    a_top = g + (springForce / m_spring);
+                    v_top += a_top * dt;
+                    springTopY += v_top * dt;
+                }
+
+                history.push({
+                    t: elapsedSimTime, 
+                    dy_top: springTopY - ceilingY_m, 
+                    dy_obj: objectY - ceilingY_m,
+                    v_top: v_top,
+                    v_obj: v_obj,
+                    a_top: a_top,
+                    a_obj: a_obj
+                });
+                updateValueDisplay();
+
+                if (springTopY > fallLimit_m) {
+                    isRunning = false;
+                }
+            }
+            
+            lastTime = timestamp;
+            draw();
+            requestAnimationFrame(update);
+        }
+
+        updateEquilibrium();
+        draw();
+        requestAnimationFrame(update);
+
+    </script>
+</body>
+</html>

@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>高校物理：運動の独立性シミュレーター</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        canvas {
+            background: #f8fafc;
+            border-bottom: 2px solid #94a3b8;
+            touch-action: none;
+        }
+    </style>
+</head>
+<body class="bg-slate-100 min-h-screen flex flex-col font-sans">
+
+    <!-- Header -->
+    <header class="bg-indigo-800 text-white p-4 shadow-lg">
+        <h1 class="text-xl font-bold">物理：斜方投射と運動の分解</h1>
+        <p class="text-sm opacity-90">水平・鉛直成分に分解して、運動の独立性を理解しよう</p>
+    </header>
+
+    <main class="flex-grow flex flex-col md:flex-row p-4 gap-4 overflow-hidden">
+        <!-- Canvas Area -->
+        <div class="flex-grow bg-white rounded-xl shadow-md overflow-hidden flex flex-col relative">
+            <canvas id="canvas" class="w-full flex-grow"></canvas>
+            
+            <!-- Stats -->
+            <div class="absolute top-4 left-4 p-3 bg-white/90 backdrop-blur rounded-lg shadow border border-slate-200 text-sm">
+                <div class="font-bold text-slate-800 mb-1 border-b pb-1">観測データ</div>
+                時刻: <span id="stat-t" class="font-mono">0.00</span> s<br>
+                水平速度 v<sub>x</sub>: <span id="stat-vx" class="font-mono text-emerald-600">0.00</span> m/s<br>
+                鉛直速度 v<sub>y</sub>: <span id="stat-vy" class="font-mono text-rose-600">0.00</span> m/s
+            </div>
+
+            <!-- Legend - Increased text size -->
+            <div class="absolute bottom-16 right-4 p-3 bg-white/80 text-xs rounded-lg border border-slate-200 shadow-sm">
+                <div class="flex items-center gap-2 mb-1"><span class="w-3 h-3 rounded-full bg-blue-600"></span> 斜方投射</div>
+                <div class="flex items-center gap-2 mb-1"><span class="w-3 h-3 rounded-full bg-emerald-500"></span> 水平：等速直線運動</div>
+                <div class="flex items-center gap-2"><span class="w-3 h-3 rounded-full bg-rose-500"></span> 鉛直：鉛直投げ上げ</div>
+            </div>
+        </div>
+
+        <!-- Controls -->
+        <div class="w-full md:w-80 space-y-4">
+            <div class="bg-white p-6 rounded-xl shadow-md space-y-6 border border-slate-200">
+                <h2 class="text-lg font-bold text-slate-700 border-b pb-2">シミュレーション設定</h2>
+                
+                <div class="space-y-4">
+                    <!-- Velocity -->
+                    <div class="space-y-2">
+                        <label class="text-sm font-medium text-slate-600">初速度 v<sub>0</sub>: <span id="val-v0" class="text-indigo-600 font-bold">20</span> m/s</label>
+                        <input type="range" id="input-v0" min="10" max="35" value="20" step="1" class="w-full h-2 bg-slate-200 rounded-lg cursor-pointer">
+                    </div>
+
+                    <!-- Angle -->
+                    <div class="space-y-2">
+                        <label class="text-sm font-medium text-slate-600">投射角 θ: <span id="val-angle" class="text-indigo-600 font-bold">45</span> °</label>
+                        <input type="range" id="input-angle" min="15" max="85" value="45" step="1" class="w-full h-2 bg-slate-200 rounded-lg cursor-pointer">
+                    </div>
+
+                    <!-- Strobe Interval -->
+                    <div class="space-y-2">
+                        <label class="text-sm font-medium text-slate-600">ストロボ間隔: <span id="val-strobe" class="text-indigo-600 font-bold">0.4</span> s</label>
+                        <input type="range" id="input-strobe" min="0.1" max="1.0" value="0.4" step="0.1" class="w-full h-2 bg-slate-200 rounded-lg cursor-pointer">
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-2">
+                    <button id="btn-start" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 rounded-lg transition shadow-md">発射！</button>
+                    <button id="btn-clear" class="bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-3 rounded-lg transition">リセット</button>
+                </div>
+
+                <div class="pt-4 border-t space-y-2">
+                    <label class="flex items-center space-x-2 cursor-pointer">
+                        <input type="checkbox" id="check-decompose" checked class="w-4 h-4 text-indigo-600 rounded">
+                        <span class="text-sm text-slate-700 font-bold">運動の分解を表示</span>
+                    </label>
+                    <label class="flex items-center space-x-2 cursor-pointer ml-4">
+                        <input type="checkbox" id="check-strobe-lines" checked class="w-4 h-4 text-indigo-400 rounded">
+                        <span class="text-xs text-slate-600 italic">残像の補助線も表示</span>
+                    </label>
+                    <label class="flex items-center space-x-2 cursor-pointer">
+                        <input type="checkbox" id="check-strobe" checked class="w-4 h-4 text-indigo-600 rounded">
+                        <span class="text-sm text-slate-700">ストロボ（残像）</span>
+                    </label>
+                </div>
+            </div>
+
+            <div class="bg-indigo-50 p-4 rounded-xl border border-indigo-100 text-xs text-indigo-800 leading-relaxed">
+                <h3 class="font-bold mb-1">💡 授業のポイント</h3>
+                斜方投射している球から水平・垂直に伸ばした点線に注目しましょう。
+                常に<span class="text-emerald-700 font-bold">水平の球</span>と<span class="text-rose-700 font-bold">垂直の球</span>に重なっていることがわかります。これにより、斜方投射の水平方向成分は等速直線運動と同じ運動をし、鉛直方向成分は鉛直投げ上げ運動と同じ運動をしていることがわかります。
+            </div>
+        </div>
+    </main>
+
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        
+        // UI elements
+        const ui = {
+            v0: document.getElementById('input-v0'),
+            angle: document.getElementById('input-angle'),
+            strobe: document.getElementById('input-strobe'),
+            valV0: document.getElementById('val-v0'),
+            valAngle: document.getElementById('val-angle'),
+            valStrobe: document.getElementById('val-strobe'),
+            btnStart: document.getElementById('btn-start'),
+            btnClear: document.getElementById('btn-clear'),
+            checkDecompose: document.getElementById('check-decompose'),
+            checkStrobeLines: document.getElementById('check-strobe-lines'),
+            checkStrobe: document.getElementById('check-strobe'),
+            statT: document.getElementById('stat-t'),
+            statVx: document.getElementById('stat-vx'),
+            statVy: document.getElementById('stat-vy')
+        };
+
+        const g = 9.8;
+        const scale = 15; 
+        const startX = 60;
+        let startY;
+        const ballRadius = 12; // Main ball size
+        const strobeRadius = 9; // Strobe ball size
+
+        let state = {
+            isRunning: false,
+            time: 0,
+            strobePoints: [],
+            lastStrobeTime: 0,
+            v0: 20,
+            angleDeg: 45,
+            strobeInterval: 0.4
+        };
+
+        function resize() {
+            canvas.width = canvas.parentElement.clientWidth;
+            canvas.height = canvas.parentElement.clientHeight;
+            startY = canvas.height - 60;
+            draw();
+        }
+
+        function updateParams() {
+            state.v0 = parseFloat(ui.v0.value);
+            state.angleDeg = parseFloat(ui.angle.value);
+            state.strobeInterval = parseFloat(ui.strobe.value);
+            ui.valV0.innerText = state.v0;
+            ui.valAngle.innerText = state.angleDeg;
+            ui.valStrobe.innerText = state.strobeInterval.toFixed(1);
+            if (!state.isRunning) resetSim();
+        }
+
+        function resetSim() {
+            state.time = 0;
+            state.strobePoints = [];
+            state.lastStrobeTime = 0;
+            state.isRunning = false;
+            draw();
+        }
+
+        /**
+         * Function to draw an arrow
+         */
+        function drawArrow(x, y, length, angleRad, color, thickness = 4) {
+            const headLength = 22; // Reverted to previous size
+            const headAngle = Math.PI / 6; 
+            const endX = x + length * Math.cos(angleRad);
+            const endY = y - length * Math.sin(angleRad);
+            
+            ctx.beginPath();
+            ctx.strokeStyle = color;
+            ctx.lineWidth = thickness;
+            ctx.lineCap = 'round';
+            ctx.moveTo(x, y);
+            ctx.lineTo(endX, endY);
+            ctx.stroke();
+
+            // Arrow head
+            ctx.beginPath();
+            ctx.fillStyle = color;
+            ctx.moveTo(endX, endY);
+            ctx.lineTo(
+                endX - headLength * Math.cos(angleRad - headAngle), 
+                endY + headLength * Math.sin(angleRad - headAngle)
+            );
+            ctx.lineTo(
+                endX - headLength * Math.cos(angleRad + headAngle), 
+                endY + headLength * Math.sin(angleRad + headAngle)
+            );
+            ctx.closePath();
+            ctx.fill();
+            
+            return { x: endX, y: endY };
+        }
+
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            // Ground
+            ctx.strokeStyle = '#94a3b8';
+            ctx.lineWidth = 2;
+            ctx.beginPath(); ctx.moveTo(0, startY); ctx.lineTo(canvas.width, startY); ctx.stroke();
+            
+            // Grid rulers (5m intervals)
+            ctx.fillStyle = '#cbd5e1';
+            ctx.font = '10px Arial';
+            for (let i = 0; i < canvas.width; i += 5 * scale) {
+                ctx.fillText(`${i/scale}m`, startX + i, startY + 20);
+            }
+
+            const rad = (state.angleDeg * Math.PI) / 180;
+            const vx = state.v0 * Math.cos(rad);
+            const vy0 = state.v0 * Math.sin(rad);
+            const vy = vy0 - g * state.time;
+
+            const x = vx * state.time;
+            const y = vy0 * state.time - 0.5 * g * state.time * state.time;
+
+            const px = startX + x * scale;
+            const py = startY - y * scale;
+
+            ui.statT.innerText = state.time.toFixed(2);
+            ui.statVx.innerText = vx.toFixed(2);
+            ui.statVy.innerText = vy.toFixed(2);
+
+            // Initial velocity vector display (only when idle)
+            if (!state.isRunning && state.time === 0) {
+                const arrowScale = 4; // Reverted from 6 back to 4
+                const arrowLen = state.v0 * arrowScale;
+                
+                const tipMain = { 
+                    x: startX + arrowLen * Math.cos(rad), 
+                    y: startY - arrowLen * Math.sin(rad) 
+                };
+                const tipX = { x: startX + vx * arrowScale, y: startY };
+                const tipY = { x: startX, y: startY - vy0 * arrowScale };
+
+                if (ui.checkDecompose.checked) {
+                    // Decomposition guide lines
+                    ctx.setLineDash([3, 3]);
+                    ctx.strokeStyle = 'rgba(148, 163, 184, 0.6)';
+                    ctx.lineWidth = 1;
+                    ctx.beginPath();
+                    ctx.moveTo(tipMain.x, tipMain.y); ctx.lineTo(tipX.x, tipX.y);
+                    ctx.moveTo(tipMain.x, tipMain.y); ctx.lineTo(tipY.x, tipY.y);
+                    ctx.stroke();
+                    ctx.setLineDash([]);
+
+                    // Component arrows
+                    drawArrow(startX, startY, vx * arrowScale, 0, 'rgba(16, 185, 129, 0.8)', 5); 
+                    drawArrow(startX, startY, vy0 * arrowScale, Math.PI/2, 'rgba(244, 63, 94, 0.8)', 5);
+                }
+                // Resultant velocity arrow
+                drawArrow(startX, startY, arrowLen, rad, '#2563eb', 6);
+            }
+
+            // Strobe drawing
+            if (ui.checkStrobe.checked) {
+                state.strobePoints.forEach(p => {
+                    if (ui.checkDecompose.checked && ui.checkStrobeLines.checked) {
+                        ctx.setLineDash([2, 2]);
+                        ctx.strokeStyle = 'rgba(148, 163, 184, 0.3)';
+                        ctx.lineWidth = 1;
+                        ctx.beginPath();
+                        ctx.moveTo(p.px, p.py); ctx.lineTo(p.px, startY);
+                        ctx.moveTo(p.px, p.py); ctx.lineTo(startX, p.py);
+                        ctx.stroke();
+                        ctx.setLineDash([]);
+                    }
+
+                    ctx.fillStyle = 'rgba(37, 99, 235, 0.25)';
+                    ctx.beginPath(); ctx.arc(p.px, p.py, strobeRadius, 0, Math.PI*2); ctx.fill();
+                    
+                    if (ui.checkDecompose.checked) {
+                        ctx.fillStyle = 'rgba(16, 185, 129, 0.25)';
+                        ctx.beginPath(); ctx.arc(p.px, startY, strobeRadius, 0, Math.PI*2); ctx.fill();
+                        ctx.fillStyle = 'rgba(244, 63, 94, 0.25)';
+                        ctx.beginPath(); ctx.arc(startX, p.py, strobeRadius, 0, Math.PI*2); ctx.fill();
+                    }
+                });
+            }
+
+            // Decomposition balls and lines
+            if (ui.checkDecompose.checked) {
+                ctx.setLineDash([4, 4]);
+                ctx.strokeStyle = '#94a3b8';
+                ctx.lineWidth = 1.5;
+                ctx.beginPath();
+                ctx.moveTo(px, py); ctx.lineTo(px, startY);
+                ctx.moveTo(px, py); ctx.lineTo(startX, py);
+                ctx.stroke();
+                ctx.setLineDash([]);
+
+                // Horizontal component ball (Green)
+                ctx.fillStyle = '#10b981';
+                ctx.beginPath(); ctx.arc(px, startY, ballRadius, 0, Math.PI*2); ctx.fill();
+                ctx.strokeStyle = 'white'; ctx.lineWidth = 2; ctx.stroke();
+
+                // Vertical component ball (Red)
+                ctx.fillStyle = '#f43f5e';
+                ctx.beginPath(); ctx.arc(startX, py, ballRadius, 0, Math.PI*2); ctx.fill();
+                ctx.strokeStyle = 'white'; ctx.lineWidth = 2; ctx.stroke();
+            }
+
+            // Main ball (Blue)
+            ctx.fillStyle = '#2563eb';
+            ctx.shadowBlur = 10; ctx.shadowColor = 'rgba(0,0,0,0.2)';
+            ctx.beginPath(); ctx.arc(px, py, ballRadius, 0, Math.PI*2); ctx.fill();
+            ctx.shadowBlur = 0;
+            ctx.strokeStyle = 'white'; ctx.lineWidth = 2; ctx.stroke();
+
+            // Landing check
+            if (state.isRunning && y < 0 && state.time > 0.1) {
+                state.isRunning = false;
+            }
+        }
+
+        function loop() {
+            if (!state.isRunning) return;
+            state.time += 0.02;
+
+            const rad = (state.angleDeg * Math.PI) / 180;
+            const x = (state.v0 * Math.cos(rad)) * state.time;
+            const y = (state.v0 * Math.sin(rad) * state.time) - (0.5 * g * state.time * state.time);
+            
+            const px = startX + x * scale;
+            const py = startY - y * scale;
+
+            if (state.time >= state.lastStrobeTime + state.strobeInterval) {
+                state.strobePoints.push({ px, py, t: state.time });
+                state.lastStrobeTime += state.strobeInterval;
+            }
+
+            draw();
+            requestAnimationFrame(loop);
+        }
+
+        ui.btnStart.onclick = () => {
+            resetSim();
+            state.isRunning = true;
+            state.strobePoints.push({ px: startX, py: startY, t: 0 });
+            loop();
+        };
+
+        ui.btnClear.onclick = resetSim;
+        ui.v0.oninput = updateParams;
+        ui.angle.oninput = updateParams;
+        ui.strobe.oninput = updateParams;
+
+        ui.checkDecompose.addEventListener('change', draw);
+        ui.checkStrobeLines.addEventListener('change', draw);
+        ui.checkStrobe.addEventListener('change', draw);
+
+        window.addEventListener('resize', resize);
+        window.onload = resize;
+    </script>
+</body>
+</html>
