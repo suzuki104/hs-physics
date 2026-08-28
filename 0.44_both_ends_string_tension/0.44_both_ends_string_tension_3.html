@@ -1,0 +1,805 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>糸にはたらく力の大きさの関係|高校物理アニメーション教材</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Font Awesome -->
+    <link class="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- MathJax for rendering math equations -->
+    <script>
+        window.MathJax = {
+            tex: {
+                inlineMath: [['$', '$'], ['\\(', '\\)']]
+            }
+        };
+    </script>
+    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <style>
+        body {
+            font-family: 'Helvetica Neue', Arial, 'Hiragino Kaku Gothic ProN', Meiryo, sans-serif;
+        }
+        canvas {
+            image-rendering: -moz-crisp-edges;
+            image-rendering: -webkit-crisp-edges;
+            image-rendering: pixelated;
+            image-rendering: crisp-edges;
+        }
+        
+        /* --- カスタムスライダーのスタイリング（触りやすく文字と重ならないように調整） --- */
+        input[type="range"] {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 100%;
+            height: 10px; /* トラック（棒）の太さを大きく */
+            background: #cbd5e1; /* slate-300 */
+            border-radius: 9999px;
+            outline: none;
+            margin-top: 14px;    /* 上の文字との重なりを完全に防止 */
+            margin-bottom: 18px; /* 下の要素との重なりを完全に防止 */
+        }
+        
+        /* webkitブラウザ用つまみ（丸）の調整 */
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 24px; /* つまみ（丸）のサイズを大きくして触りやすく */
+            height: 24px;
+            border-radius: 50%;
+            background: #4f46e5; /* indigo-600 */
+            cursor: pointer;
+            border: 3px solid #ffffff;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+            transition: transform 0.1s ease, background-color 0.1s ease;
+        }
+        input[type="range"]::-webkit-slider-thumb:hover {
+            transform: scale(1.15);
+            background: #4338ca; /* indigo-700 */
+        }
+
+        /* Firefox用つまみ（丸）の調整 */
+        input[type="range"]::-moz-range-thumb {
+            width: 24px; /* つまみ（丸）のサイズを大きくして触りやすく */
+            height: 24px;
+            border-radius: 50%;
+            background: #4f46e5;
+            cursor: pointer;
+            border: 3px solid #ffffff;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+            transition: transform 0.1s ease, background-color 0.1s ease;
+        }
+        input[type="range"]::-moz-range-thumb:hover {
+            transform: scale(1.15);
+            background: #4338ca;
+        }
+
+        /* 糸の質量スライダー専用（丸の色を文字色 rose-700/rose-600 と同じ rose系に上書き） */
+        #massRope::-webkit-slider-thumb {
+            background: #e11d48 !important; /* rose-600 */
+        }
+        #massRope::-webkit-slider-thumb:hover {
+            background: #be123c !important; /* rose-700 */
+        }
+        #massRope::-moz-range-thumb {
+            background: #e11d48 !important;
+        }
+        #massRope::-moz-range-thumb:hover {
+            background: #be123c !important;
+        }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-screen flex flex-col">
+
+    <!-- ヘッダー（タイトル中央揃え、学習目標テキストを配置） -->
+    <header class="bg-indigo-700 text-white shadow-md p-4">
+        <div class="container mx-auto text-center">
+            <h1 class="text-xl md:text-2xl font-bold">
+                <span>糸にはたらく力の大きさの関係</span>
+            </h1>
+            <p class="text-xs md:text-sm mt-2 text-indigo-100 max-w-2xl mx-auto font-medium leading-relaxed">
+                軽い糸（物体に対して糸の質量が無視できる）のとき、糸の両端にかかる力の大きさは同じになると考えられることを理解しよう
+            </p>
+        </div>
+    </header>
+
+    <!-- メインコンテンツ (1カラム最大幅制限レイアウトで全体を中央に寄せて美しく構成) -->
+    <main class="container mx-auto p-4 flex-grow flex flex-col gap-6 max-w-4xl">
+        
+        <!-- パラメータ設定 ＋ アニメーションキャンバス -->
+        <div class="flex flex-col gap-6 w-full">
+            
+            <!-- パラメータ調整カード（4スライダーをグリッド配置、スライダー位置を入れ替え、文字サイズ全体を底上げ） -->
+            <div class="bg-white rounded-xl shadow-md p-5 border border-slate-200">
+                <h2 class="text-base sm:text-lg font-bold mb-4 flex items-center gap-2 text-indigo-700 border-b pb-2">
+                    <i class="fa-solid fa-sliders"></i>
+                    <span>実験パラメータ</span>
+                </h2>
+                
+                <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 md:gap-6">
+                    <!-- 糸の質量（1番目に配置。文字とスライダーを目立つピンク/ローズ系に変更） -->
+                    <div>
+                        <div class="flex justify-between items-center mb-1 h-8 sm:h-6">
+                            <label class="text-xs sm:text-sm font-bold text-rose-700">糸の質量 $m_{\text{rope}}$ :</label>
+                            <span class="text-rose-600 font-bold text-xs sm:text-sm whitespace-nowrap" id="val-massRope">0.00 kg</span>
+                        </div>
+                        <input type="range" id="massRope" min="0.0" max="0.50" step="0.01" value="0.00" 
+                               class="accent-rose-500 font-bold">
+                    </div>
+
+                    <!-- 物体Aの質量（2番目に配置） -->
+                    <div>
+                        <div class="flex justify-between items-center mb-1 h-8 sm:h-6">
+                            <label class="text-xs sm:text-sm font-semibold text-slate-700">物体Aの質量 $m_A$ :</label>
+                            <span class="text-indigo-600 font-bold text-xs sm:text-sm whitespace-nowrap" id="val-massA">6.0 kg</span>
+                        </div>
+                        <input type="range" id="massA" min="1.0" max="15.0" step="0.5" value="6.0" 
+                               class="accent-indigo-600">
+                    </div>
+
+                    <!-- 物体Bの質量 -->
+                    <div>
+                        <div class="flex justify-between items-center mb-1 h-8 sm:h-6">
+                            <label class="text-xs sm:text-sm font-semibold text-slate-700">物体Bの質量 $m_B$ :</label>
+                            <span class="text-indigo-600 font-bold text-xs sm:text-sm whitespace-nowrap" id="val-massB">6.0 kg</span>
+                        </div>
+                        <input type="range" id="massB" min="1.0" max="15.0" step="0.5" value="6.0" 
+                               class="accent-indigo-600">
+                    </div>
+
+                    <!-- 外力 F -->
+                    <div>
+                        <div class="flex justify-between items-center mb-1 h-8 sm:h-6">
+                            <label class="text-xs sm:text-sm font-semibold text-slate-700">引く力 $F$ :</label>
+                            <span class="text-indigo-600 font-bold text-xs sm:text-sm whitespace-nowrap" id="val-force">50.0 N</span>
+                        </div>
+                        <input type="range" id="force" min="0" max="100" step="5" value="50" 
+                               class="accent-indigo-600">
+                    </div>
+                </div>
+
+                <!-- ドロップダウンリスト（「系全体」と「糸」の2択に制限） -->
+                <div class="mt-4 pt-3 border-t border-slate-100 flex flex-row items-center gap-1.5 w-full">
+                    <span class="text-xs sm:text-sm font-bold text-slate-700 whitespace-nowrap">着目:</span>
+                    <select id="select-focus" class="text-xs sm:text-sm py-2 px-2 rounded-lg font-bold bg-white border border-slate-300 text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition duration-150 w-auto shrink-0">
+                        <option value="all">系全体</option>
+                        <option value="rope">糸</option>
+                    </select>
+                    
+                    <button id="btn-play-pause" class="py-2 px-3 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-bold transition duration-200 flex items-center justify-center gap-1 text-xs sm:text-sm whitespace-nowrap shrink-0">
+                        <i class="fa-solid fa-play" id="icon-play"></i>
+                        <span id="text-play">スタート</span>
+                    </button>
+                    <button id="btn-reset" class="py-2 px-3 rounded-lg bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold transition duration-200 flex items-center justify-center gap-1 text-xs sm:text-sm whitespace-nowrap shrink-0">
+                        <i class="fa-solid fa-rotate-left"></i>
+                        <span>リセット</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- ① メインアニメーションキャンバス -->
+            <div class="bg-white rounded-xl shadow-md p-4 border border-slate-200 flex flex-col">
+                <div class="flex justify-between items-center mb-2">
+                    <span class="text-sm sm:text-base font-bold text-slate-700"><i class="fa-solid fa-film text-indigo-600 mr-1"></i>シミュレーション</span>
+                    <div class="text-xs sm:text-sm text-slate-500 flex gap-3">
+                        <span>経過時間: <span id="timer" class="font-mono text-indigo-600 font-bold">0.00</span> 秒</span>
+                        <span>移動距離: <span id="distance" class="font-mono text-indigo-600 font-bold">0.00</span> m</span>
+                        <span>現在速度: <span id="current-vel" class="font-mono text-indigo-600 font-bold">0.00</span> m/s</span>
+                    </div>
+                </div>
+
+                <!-- キャンバスコンテナ (背景白、縦横アスペクト比8:3) -->
+                <div class="relative bg-white rounded-lg overflow-hidden border border-slate-200 aspect-[8/3] w-full">
+                    <canvas id="physics-canvas" class="absolute inset-0 w-full h-full"></canvas>
+                    
+                    <!-- 画面端警告メッセージ -->
+                    <div id="reset-alert" class="hidden absolute inset-0 bg-black/80 backdrop-blur-sm flex flex-col justify-center items-center text-white text-center p-2 sm:p-4">
+                        <p class="text-xs sm:text-lg font-bold mb-1 sm:mb-2">物体が端に到達しました！</p>
+                        <p class="text-[10px] sm:text-sm text-slate-300 mb-2 sm:mb-4">パラメータを変更するか、リセットして再度実験できます。</p>
+                        <button onclick="resetSimulation()" class="bg-indigo-600 hover:bg-indigo-700 px-3 py-1 sm:px-4 sm:py-2 rounded-lg text-[10px] sm:text-sm font-bold transition">
+                            <i class="fa-solid fa-rotate-left mr-1"></i> 最初からもう一度
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 図中ベクトルの意味をアニメーションの枠の外（右下）に配置 -->
+                <div class="flex justify-end items-center mt-3 text-xs sm:text-sm gap-4">
+                    <span class="font-bold text-slate-700">図中ベクトルの意味：</span>
+                    <div class="flex items-center gap-1.5">
+                        <span class="w-5 h-1.5 bg-red-500 inline-block rounded"></span>
+                        <span>引く力 $F$</span>
+                    </div>
+                    <div class="flex items-center gap-1.5">
+                        <span class="w-5 h-1.5 bg-blue-500 inline-block rounded"></span>
+                        <span>糸の受ける力 $T_{\text{A}}, T_{\text{B}}$</span>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- 下部：詳細な理論値テーブルと解説パネル -->
+        <div class="grid grid-cols-1 md:grid-cols-12 gap-6 mt-2">
+            
+            <!-- ③ 理難値の表示・計算結果（理論値と計算式） ※指示により見出しh2行は削除しました -->
+            <div class="bg-white rounded-xl shadow-md p-5 border border-slate-200 md:col-span-7">
+                
+                <!-- 縦方向の並び（上の行に一覧表、下の行に連立式） -->
+                <div class="flex flex-col gap-5 text-sm sm:text-base">
+                    <!-- 質量、合力、加速度の一覧表 (連立式の上) -->
+                    <div class="flex flex-col justify-center">
+                        <p class="font-bold text-slate-700 mb-2 flex items-center gap-1">
+                            <i class="fa-solid fa-table"></i>
+                            <span>各対象の質量・合力・加速度の一覧</span>
+                        </p>
+                        <div class="overflow-hidden border border-slate-200 rounded-lg">
+                            <table class="min-w-full text-xs sm:text-sm text-left text-slate-600">
+                                <thead class="bg-slate-100 text-slate-700 font-bold border-b border-slate-200">
+                                    <tr>
+                                        <th class="px-3 py-2.5">対象</th>
+                                        <th class="px-3 py-2.5">質量 (kg)</th>
+                                        <th class="px-3 py-2.5">合力 (N)</th>
+                                        <th class="px-3 py-2.5">加速度 (m/s²)</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr class="border-b border-slate-200 bg-slate-50 hover:bg-slate-100">
+                                        <td class="px-3 py-2.5 font-semibold text-slate-900">糸 (糸単体)</td>
+                                        <td class="px-3 py-2.5 font-mono" id="table-massRope">0.00</td>
+                                        <td class="px-3 py-2.5 font-mono text-slate-600 font-semibold" id="table-forceRope">0.00</td>
+                                        <td class="px-3 py-2.5 font-mono text-indigo-600" id="table-accelRope">0.00</td>
+                                    </tr>
+                                    <tr class="bg-white hover:bg-slate-50">
+                                        <td class="px-3 py-2.5 font-bold text-indigo-900">全体 (1つの系)</td>
+                                        <td class="px-3 py-2.5 font-bold font-mono text-indigo-900" id="table-massTotal">0.00</td>
+                                        <td class="px-3 py-2.5 font-bold font-mono text-indigo-600" id="table-forceTotal">0.00</td>
+                                        <td class="px-3 py-2.5 font-bold font-mono text-indigo-600" id="table-accelTotal">0.00</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- 運動方程式の連立 -->
+                    <div class="space-y-3">
+                        <div class="p-3 bg-indigo-50/50 rounded-lg border border-indigo-100/50">
+                            <p class="font-bold text-slate-700 mb-1">運動方程式の連立</p>
+                            <div class="space-y-1 text-slate-600">
+                                <div>系全体: $(m_A + m_{\text{rope}} + m_B) a = F$</div>
+                                <div>糸: $m_{\text{rope}} a = T_{\text{A}} - T_{\text{B}}$</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ④ 解説パネル (md:col-span-5、指示により解説見出し削除、背景色をより目立たないSlate系に変更、上詰め表示かつコンテンツの高さに合わせた枠に修正) -->
+            <div class="bg-slate-100/70 border border-slate-200 rounded-xl p-5 md:col-span-5 flex flex-col justify-start shadow-inner self-start">
+                <ul class="list-disc list-inside text-xs sm:text-sm text-slate-700 space-y-3 leading-relaxed">
+                    <li><strong>加速度：</strong> 外力 $F$ と全体の質量 $(m_A+m_{\text{rope}}+m_B)$ によって全体の加速度が決まります ($a = \frac{F}{m_A+m_{\text{rope}}+m_B}$)。</li>
+                    <li><strong>糸が受ける力 $T_{\text{A}}, T_{\text{B}}$ の役割：</strong> 糸が受ける力は、右端で物体Aから受ける $T_{\text{A}}$ (右向き) と、左端で物体Bから受ける $T_{\text{B}}$ (左向き) です。物体の質量に対して糸の質量が小さくなるにつれて、糸が左右の物体から受ける力の大きさは同じ値に近づき、糸の質量が0のとき糸が左右 of 物体から受ける力は完全に同じ値になります。</li>
+                </ul>
+            </div>
+
+        </div>
+
+    </main>
+
+    <!-- フッター（ホーム、物理一覧ボタン、鈴木先生のコピーライト） -->
+    <footer class="bg-white py-8 border-t border-slate-200 mt-6">
+        <div class="container mx-auto px-4">
+            <div class="flex flex-col items-center gap-6 sm:gap-8 pt-6 sm:pt-8 border-t border-slate-100">
+                <div class="flex gap-4 sm:gap-6 text-sm font-bold">
+                    <a href="../6.0_home/home.html" class="flex items-center gap-2 px-6 sm:px-8 py-3 sm:py-4 bg-slate-800 text-white rounded-2xl hover:bg-slate-700 transition-colors">
+                        <i class="fa-solid fa-house"></i> ホーム
+                    </a>
+                    <a href="../6.1_physics_home/physics_home.html" class="flex items-center gap-2 px-6 sm:px-8 py-3 sm:py-4 bg-slate-800 text-white rounded-2xl hover:bg-slate-700 transition-colors">
+                        <i class="fa-solid fa-list"></i> 物理一覧
+                    </a>
+                </div>
+                <p class="text-[10px] sm:text-[11px] text-slate-400">Copyright &copy; 2021-2026 T.Suzuki</p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- JavaScript & 物理シミュレーションロジック -->
+    <script>
+        // ----------------- DOM要素 of 取得 -----------------
+        const canvas = document.getElementById('physics-canvas');
+        const ctx = canvas.getContext('2d');
+        const btnPlayPause = document.getElementById('btn-play-pause');
+        const btnReset = document.getElementById('btn-reset');
+        const iconPlay = document.getElementById('icon-play');
+        const textPlay = document.getElementById('text-play');
+        const resetAlert = document.getElementById('reset-alert');
+
+        // 着目セレクトボックス
+        const selectFocus = document.getElementById('select-focus');
+
+        // スライダー類
+        const sliderMassA = document.getElementById('massA');
+        const sliderMassRope = document.getElementById('massRope');
+        const sliderMassB = document.getElementById('massB');
+        const sliderForce = document.getElementById('force');
+
+        // 数値表示用
+        const valMassA = document.getElementById('val-massA');
+        const valMassRope = document.getElementById('val-massRope');
+        const valMassB = document.getElementById('val-massB');
+        const valForce = document.getElementById('val-force');
+
+        const timerEl = document.getElementById('timer');
+        const distanceEl = document.getElementById('distance');
+        const currentVelEl = document.getElementById('current-vel');
+
+        // ----------------- シミュレーション変数 -----------------
+        const g = 9.8; // 重力加速度 (m/s^2)
+        let isRunning = false;
+        let animationFrameId = null;
+
+        // 物理パラメータの状態
+        let massA = parseFloat(sliderMassA.value);
+        let massRope = parseFloat(sliderMassRope.value);
+        let massB = parseFloat(sliderMassB.value);
+        let pullForce = parseFloat(sliderForce.value);
+        let muPrime = 0; // 摩擦係数は常に0に固定
+        let focusMode = 'all'; // デフォルトは 'all' (系全体)
+
+        // 導出される理論値
+        let accel = 0;
+        let tensionA = 0; // 糸の右端に働く張力
+        let tensionB = 0; // 糸の左端に働く張力
+
+        // 動的変数 (リアルタイム変化)
+        let time = 0; // 経過時間 (s)
+        let posX_B = 100; // 物体Bの開始位置 (px)
+        let vel = 0; // 現在速度 (m/s)
+        let maxPosLimit = 0; // シミュレーション停止端位置 (px)
+
+        // ピクセルスケール
+        // 1m = 120px と定義
+        const meterScale = 120; 
+
+        // ----------------- Canvasリッチテキスト描画 (下付き文字対応用) -----------------
+        function drawRichText(ctx, text, x, y, fontSize, scale) {
+            ctx.font = `bold ${fontSize}px system-ui`;
+            let currentX = x;
+            for (let i = 0; i < text.length; i++) {
+                if (text[i] === '_') {
+                    // "_"の次の文字を下付き(75%サイズでやや下方に配置)にして描画
+                    i++;
+                    if (i < text.length) {
+                        ctx.save();
+                        ctx.font = `bold ${fontSize * 0.75}px system-ui`;
+                        ctx.fillText(text[i], currentX, y + fontSize * 0.25);
+                        currentX += ctx.measureText(text[i]).width;
+                        ctx.restore();
+                    }
+                } else {
+                    ctx.fillText(text[i], currentX, y);
+                    currentX += ctx.measureText(text[i]).width;
+                }
+            }
+        }
+
+        // ----------------- 物理演算 -----------------
+        function calculatePhysics() {
+            // 滑り出すかの判定 (摩擦力は0)
+            const totalFriction = 0;
+            const totalMass = massA + massB + massRope;
+
+            if (pullForce > totalFriction) {
+                // 運動方程式より
+                accel = (pullForce - totalFriction) / totalMass;
+                // 物体Bの運動方程式： mB * a = T_B  => T_B = mB * a
+                tensionB = massB * accel;
+                // 糸の運動方程式： mRope * a = T_A - T_B  => T_A = T_B + mRope * a
+                tensionA = tensionB + massRope * accel;
+            } else {
+                accel = 0;
+                tensionB = pullForce > 0 ? (pullForce * massB / totalMass) : 0;
+                tensionA = pullForce > 0 ? (pullForce * (massB + massRope) / totalMass) : 0;
+            }
+
+            // 各対象の質量と合力の表の更新
+            const forceRope = tensionA - tensionB; // 糸の合力 (T_A - T_B)
+            const forceTotal = pullForce;       // 全体の合力 (F)
+            
+            document.getElementById('table-massRope').innerText = massRope.toFixed(2);
+            document.getElementById('table-forceRope').innerText = forceRope.toFixed(2);
+            
+            document.getElementById('table-massTotal').innerText = totalMass.toFixed(2);
+            document.getElementById('table-forceTotal').innerText = forceTotal.toFixed(2);
+
+            // 加速度の表示を更新
+            document.getElementById('table-accelRope').innerText = accel.toFixed(2);
+            document.getElementById('table-accelTotal').innerText = accel.toFixed(2);
+        }
+
+        // ----------------- 描画処理 (Canvas) -----------------
+        // DPI対策を施したリサイズ
+        function resizeCanvas() {
+            const rect = canvas.parentNode.getBoundingClientRect();
+            canvas.width = rect.width * window.devicePixelRatio;
+            canvas.height = rect.height * window.devicePixelRatio;
+            ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
+            maxPosLimit = rect.width; // 終了基準はスケーリング後の論理サイズを元行う
+            draw();
+        }
+
+        // 矢印（ベクトル）を描画するヘルパー関数 (すべての文字サイズを13基準に統一)
+        function drawVector(startX, startY, length, color, label, isUp = false, scale = 1.0, isTension = false) {
+            if (Math.abs(length) < 5 * scale) return; // 小さすぎる矢印は描画しない
+
+            const arrowSize = 12 * scale; 
+            const endX = startX + length;
+            const endY = startY;
+
+            ctx.beginPath();
+            ctx.strokeStyle = color;
+            ctx.lineWidth = 5 * scale; 
+            ctx.moveTo(startX, startY);
+            ctx.lineTo(endX, endY);
+            ctx.stroke();
+
+            // 矢の頭
+            ctx.beginPath();
+            ctx.fillStyle = color;
+            ctx.moveTo(endX, endY);
+            if (length > 0) {
+                ctx.lineTo(endX - arrowSize, endY - arrowSize / 1.5);
+                ctx.lineTo(endX - arrowSize, endY + arrowSize / 1.5);
+            } else {
+                ctx.lineTo(endX + arrowSize, endY - arrowSize / 1.5);
+                ctx.lineTo(endX + arrowSize, endY + arrowSize / 1.5);
+            }
+            ctx.fill();
+
+            // ラベル配置 (文字サイズを「引く力」と完全に同じ 13基準 に統一)
+            ctx.fillStyle = color;
+            const baseFontSize = 13; // 統一値
+            const labelScale = Math.max(0.75, scale); // スマホでの極端な縮小を制限
+            const fontSize = baseFontSize * labelScale;
+            const offsetUp = 12 * labelScale;
+            const offsetDown = 20 * labelScale;
+            const textY = isUp ? startY - offsetUp : startY + offsetDown;
+            
+            let labelX;
+            if (length > 0) {
+                const labelMinOffset = 12 * labelScale;
+                const labelCenterOffset = 25 * labelScale;
+                labelX = Math.max(startX + labelMinOffset, startX + length / 2 - labelCenterOffset);
+            } else {
+                const labelLeftOffset = 65 * labelScale;
+                const labelCenterOffset = 25 * labelScale;
+                labelX = Math.min(startX - labelLeftOffset, startX + length / 2 - labelCenterOffset);
+            }
+            drawRichText(ctx, label, labelX, textY, fontSize, labelScale);
+        }
+
+        function draw() {
+            const width = canvas.width / window.devicePixelRatio;
+            const height = canvas.height / window.devicePixelRatio;
+
+            ctx.clearRect(0, 0, width, height);
+
+            // 背景を完全に白色にする
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(0, 0, width, height);
+
+            // PC表示(幅800px基準)に対する現在のスケーリング比率を計算
+            const scale = width / 800;
+            // スマホ縦画面等の文字サイズ極小化を防止するための底上げスケール
+            const labelScale = Math.max(0.75, scale);
+
+            // 床の描画
+            const floorY = height - 80 * scale;
+            ctx.fillStyle = '#475569'; // slate-600 (灰色)
+            ctx.fillRect(0, floorY, width, height - floorY);
+
+            // グリッド・目盛り (1m = meterScale px)
+            ctx.strokeStyle = 'rgba(0, 0, 0, 0.1)';
+            ctx.lineWidth = 1 * scale;
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
+            ctx.font = `${10 * labelScale}px monospace`; // 目盛りのフォントを拡大
+            
+            const scaledMeterScale = meterScale * scale;
+            for (let x = 0; x < width; x += scaledMeterScale / 2) {
+                ctx.beginPath();
+                ctx.moveTo(x, floorY);
+                ctx.lineTo(x, floorY + 8 * scale);
+                ctx.stroke();
+                
+                const distanceInMeter = (x - 100 * scale) / scaledMeterScale;
+                if (distanceInMeter >= 0 && Number.isInteger(distanceInMeter)) {
+                    ctx.fillText(`${distanceInMeter}m`, x - 8 * scale, floorY + 22 * scale);
+                }
+            }
+
+            // 物体の描画サイズ設定
+            const sizeA = Math.max(65, Math.min(115, 65 + (massA - 1) * 3.0)) * scale;
+            const sizeB = Math.max(65, Math.min(115, 65 + (massB - 1) * 3.0)) * scale;
+
+            // 物体A, B of X位置
+            const ropeLength = 120 * scale;
+            const blockB_X = posX_B * scale;
+            const blockB_Y = floorY - sizeB;
+
+            const blockA_X = blockB_X + sizeB + ropeLength;
+            const blockA_Y = floorY - sizeA;
+
+            // 糸の高さを「2つの物体のうち小さい方の物体の高さの中心の高さ」にする
+            const minSize = Math.min(sizeA, sizeB);
+            const ropeY = floorY - minSize / 2;
+
+            // 糸着目モードの判定
+            const isRopeFocus = (focusMode === 'rope');
+
+            // 1. 糸（連結線）の描画 (質量増加による急激な太りすぎを防ぐよう係数を調整)
+            ctx.beginPath();
+            ctx.strokeStyle = '#64748b'; // slate-500
+            const ropeWidth = (5.5 + (massRope > 0 ? (massRope / 0.50) * 1.5 : 0)) * scale;
+            ctx.lineWidth = ropeWidth;
+            ctx.moveTo(blockB_X + sizeB, ropeY);
+            ctx.lineTo(blockA_X, ropeY);
+            ctx.stroke();
+
+            // 1.5 糸のラベル・情報 (糸の真上に物体AやBと同様に配置、文字サイズを13に統一し、位置を今より少し上配置に調整)
+            const ropeCenterX = (blockB_X + sizeB + blockA_X) / 2;
+            ctx.save();
+            ctx.fillStyle = '#0f172a';
+            ctx.textAlign = 'center';
+            ctx.font = 'bold ' + (13 * labelScale) + 'px sans-serif';
+            ctx.fillText('糸', ropeCenterX, ropeY - 55 * scale);
+            ctx.font = 'bold ' + (13 * labelScale) + 'px sans-serif';
+            ctx.fillText(`${massRope.toFixed(2)}kg`, ropeCenterX, ropeY - 37 * scale);
+            ctx.restore();
+
+            // 2. 物体B (後ろの物体)
+            ctx.save();
+            if (isRopeFocus) {
+                // 糸着目モードの時は、物体Bと文字や関連ベクトルを少し薄く（不透明度0.25に調整して見やすく）する
+                ctx.globalAlpha = 0.25; 
+                ctx.fillStyle = '#f8fafc'; // とても薄い灰色 (slate-50)
+                ctx.strokeStyle = '#cbd5e1'; // 薄い灰色 (slate-300)
+            } else {
+                ctx.fillStyle = '#e0f2fe'; // 中は非常に薄い青 (sky-100)
+                ctx.strokeStyle = '#0284c7'; // 枠は元の青色のまま
+            }
+            ctx.lineWidth = 3 * scale;
+            ctx.beginPath();
+            ctx.roundRect(blockB_X, blockB_Y, sizeB, sizeB, 6 * scale);
+            ctx.fill();
+            ctx.stroke();
+
+            // 物体Bのラベル・情報 (物体の「真上」に配置。文字サイズを13に統一)
+            if (isRopeFocus) {
+                ctx.fillStyle = '#94a3b8';
+            } else {
+                ctx.fillStyle = '#0f172a';
+            }
+            ctx.font = 'bold ' + (13 * labelScale) + 'px sans-serif';
+            ctx.fillText('B', blockB_X + sizeB/2 - 6 * scale, blockB_Y - 24 * scale); // 物体上面から-24px上へ
+            ctx.font = (13 * labelScale) + 'px sans-serif';
+            ctx.fillText(`${massB.toFixed(1)}kg`, blockB_X + sizeB/2 - 16 * scale, blockB_Y - 8 * scale); // 物体上面から-8px上へ
+            ctx.restore();
+
+            // 3. 物体A (前の物体)
+            ctx.save();
+            if (isRopeFocus) {
+                // 糸着目モードの時は、物体Aを少し薄く（不透明度0.25に調整して見やすく）する
+                ctx.globalAlpha = 0.25;
+                ctx.fillStyle = '#f8fafc'; // とても薄い灰色 (slate-50)
+                ctx.strokeStyle = '#cbd5e1'; // 薄い灰色 (slate-300)
+            } else {
+                ctx.fillStyle = '#e0e7ff'; // 中は非常に薄い紫 (indigo-100)
+                ctx.strokeStyle = '#4f46e5'; // 枠は元の紫色のまま
+            }
+            ctx.lineWidth = 3 * scale;
+            ctx.beginPath();
+            ctx.roundRect(blockA_X, blockA_Y, sizeA, sizeA, 6 * scale);
+            ctx.fill();
+            ctx.stroke();
+
+            // 物体Aのラベル・情報 (物体の「真上」に配置。文字サイズを13に統一)
+            if (isRopeFocus) {
+                ctx.fillStyle = '#94a3b8';
+            } else {
+                ctx.fillStyle = '#0f172a';
+            }
+            ctx.font = 'bold ' + (13 * labelScale) + 'px sans-serif';
+            ctx.fillText('A', blockA_X + sizeA/2 - 6 * scale, blockA_Y - 24 * scale); // 物体上面から-24px上へ
+            ctx.font = (13 * labelScale) + 'px sans-serif';
+            ctx.fillText(`${massA.toFixed(1)}kg`, blockA_X + sizeA/2 - 16 * scale, blockA_Y - 8 * scale); // 物体上面から-8px上へ
+            ctx.restore();
+
+            // 4. 糸自体が左右から受ける力 (張力の反作用。文字サイズを13に統一)
+            // 左端：物体Bから引かれる力 T_B (左向き、ラベルの下付き表記 '_B'、下側配置)
+            if (tensionB > 0) {
+                const tensionVectorB = Math.min(60 * scale, tensionB * 2.0 * scale);
+                drawVector(blockB_X + sizeB, ropeY, -tensionVectorB, '#3b82f6', `T_B = ${tensionB.toFixed(1)}N`, false, scale, true);
+            }
+
+            // 右端：物体Aから引かれる力 T_A (右向き、ラベルの下付き表記 '_A'、下側配置)
+            if (tensionA > 0) {
+                const tensionVectorA = Math.min(60 * scale, tensionA * 2.0 * scale);
+                drawVector(blockA_X, ropeY, tensionVectorA, '#3b82f6', `T_A = ${tensionA.toFixed(1)}N`, false, scale, true);
+            }
+
+            // 5. ベクトルの描画 (外力 F、糸着目モードの時は不透明度0.25にして薄く描画)
+            if (pullForce > 0) {
+                const forceVectorLength = Math.min(120 * scale, pullForce * 2.0 * scale);
+                if (isRopeFocus) {
+                    ctx.save();
+                    ctx.globalAlpha = 0.25;
+                    drawVector(blockA_X + sizeA, ropeY, forceVectorLength, '#cbd5e1', `F = ${pullForce}N`, true, scale, false);
+                    ctx.restore();
+                } else {
+                    drawVector(blockA_X + sizeA, ropeY, forceVectorLength, '#ef4444', `F = ${pullForce}N`, true, scale, false);
+                }
+            }
+
+            // 6. 速度ベクトルの描画 (糸着目モードの時は非表示)
+            if (vel > 0 && !isRopeFocus) {
+                ctx.save();
+                ctx.globalAlpha = 1.0;
+                const velVectorLength = Math.min(80 * scale, vel * 12 * scale);
+                
+                // ２つの物体の中心の上空、物体上のテキスト（上面-24px）とも重ならない「最上段」に高度配置
+                const maxHeight = Math.max(sizeA, sizeB);
+                const velStartX = (blockB_X + sizeB + blockA_X) / 2;
+                const velStartY = floorY - maxHeight - 45 * scale; // 上空へ逃がして重なりを回避
+
+                drawVector(velStartX, velStartY, velVectorLength, '#f59e0b', `v = ${vel.toFixed(1)}m/s`, true, scale, false);
+                ctx.restore();
+            }
+        }
+
+        // ----------------- シミュレーションループ -----------------
+        let lastTime = 0;
+
+        function updateSimulation(timestamp) {
+            if (!isRunning) return;
+
+            if (!lastTime) lastTime = timestamp;
+            const dt = ((timestamp - lastTime) / 1000) * 0.4; 
+            lastTime = timestamp;
+
+            // 加速度、現在位置、速度のリアルタイム更新
+            calculatePhysics();
+
+            if (accel > 0) {
+                vel += accel * dt;
+                posX_B += vel * dt * meterScale;
+                time += dt;
+            }
+
+            // UI数値の更新
+            timerEl.innerText = time.toFixed(2);
+            distanceEl.innerText = ((posX_B - 100) / meterScale).toFixed(2);
+            currentVelEl.innerText = vel.toFixed(2);
+
+            draw();
+
+            // 終了判定（物体Bが完全に基準幅800pxの画面右端から見えなくなったら停止）
+            if (posX_B >= 800) {
+                pauseSimulation();
+                
+                // スタートボタンを「終了」にし、クリックできないように無効化
+                btnPlayPause.disabled = true;
+                btnPlayPause.classList.add('opacity-50', 'cursor-not-allowed');
+                iconPlay.className = "fa-solid fa-ban";
+                textPlay.innerText = "終了";
+
+                resetAlert.classList.remove('hidden');
+            } else {
+                animationFrameId = requestAnimationFrame(updateSimulation);
+            }
+        }
+
+        function startSimulation() {
+            isRunning = true;
+            lastTime = 0;
+            iconPlay.className = "fa-solid fa-pause";
+            textPlay.innerText = "一時停止";
+            animationFrameId = requestAnimationFrame(updateSimulation);
+        }
+
+        function pauseSimulation() {
+            isRunning = false;
+            iconPlay.className = "fa-solid fa-play";
+            textPlay.innerText = "スタート";
+            if (animationFrameId) {
+                cancelAnimationFrame(animationFrameId);
+            }
+        }
+
+        function toggleSimulation() {
+            if (isRunning) {
+                pauseSimulation();
+            } else {
+                startSimulation();
+            }
+        }
+
+        function resetSimulation() {
+            pauseSimulation();
+            
+            // 終了後に無効化されたスタートボタンを元に戻す
+            btnPlayPause.disabled = false;
+            btnPlayPause.classList.remove('opacity-50', 'cursor-not-allowed');
+            iconPlay.className = "fa-solid fa-play";
+            textPlay.innerText = "スタート";
+
+            resetAlert.classList.add('hidden');
+            time = 0;
+            posX_B = 100;
+            vel = 0;
+            
+            timerEl.innerText = "0.00";
+            distanceEl.innerText = "0.00";
+            currentVelEl.innerText = "0.00";
+
+            calculatePhysics();
+            draw();
+        }
+
+        // ----------------- 着目表示の切り替えロジック -----------------
+        function setFocusMode(mode) {
+            focusMode = mode;
+            
+            // ドロップダウンリストの値を同期
+            selectFocus.value = mode;
+
+            // 再描画
+            draw();
+        }
+
+        // ----------------- イベントリスナーの設定 -----------------
+        
+        // 各スライダー変更時
+        function handleSliderChange() {
+            // パラメータが変更されたら自動リセット
+            resetSimulation();
+
+            massA = parseFloat(sliderMassA.value);
+            massRope = parseFloat(sliderMassRope.value);
+            massB = parseFloat(sliderMassB.value);
+            pullForce = parseFloat(sliderForce.value);
+
+            // ラベルの更新（糸は小数点第2位まで表示）
+            valMassA.innerText = `${massA.toFixed(1)} kg`;
+            valMassRope.innerText = `${massRope.toFixed(2)} kg`;
+            valMassB.innerText = `${massB.toFixed(1)} kg`;
+            valForce.innerText = `${pullForce.toFixed(1)} N`;
+
+            calculatePhysics();
+            draw();
+        }
+
+        sliderMassA.addEventListener('input', handleSliderChange);
+        sliderMassRope.addEventListener('input', handleSliderChange);
+        sliderMassB.addEventListener('input', handleSliderChange);
+        sliderForce.addEventListener('input', handleSliderChange);
+
+        btnPlayPause.addEventListener('click', toggleSimulation);
+        btnReset.addEventListener('click', resetSimulation);
+
+        // 着目セレクトボックスの変更イベント登録
+        selectFocus.addEventListener('change', (e) => setFocusMode(e.target.value));
+
+        window.addEventListener('resize', resizeCanvas);
+
+        // ----------------- 初期化処理 -----------------
+        window.onload = function() {
+            // DPIとキャンバスサイズ調整
+            resizeCanvas();
+            // 物理初期化
+            calculatePhysics();
+            // 初期ロードの瞬間から張力の作図・表示がされるように確定した数値で再描画
+            draw();
+        };
+    </script>
+</body>
+</html>

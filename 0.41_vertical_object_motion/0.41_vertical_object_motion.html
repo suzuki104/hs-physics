@@ -1,0 +1,963 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>鉛直方向の物体の運動|高校物理アニメーション教材</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Chart.js for graphs -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- MathJax for rendering math equations -->
+    <script>
+        window.MathJax = {
+            tex: {
+                inlineMath: [['$', '$'], ['\\(', '\\)']]
+            }
+        };
+    </script>
+    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <style>
+        body {
+            font-family: 'Helvetica Neue', Arial, 'Hiragino Kaku Gothic ProN', Meiryo, sans-serif;
+        }
+        canvas {
+            image-rendering: -moz-crisp-edges;
+            image-rendering: -webkit-crisp-edges;
+            image-rendering: pixelated;
+            image-rendering: crisp-edges;
+        }
+        
+        /* --- カスタムスライダーのスタイリング（触りやすく文字と重ならないように調整） --- */
+        input[type="range"] {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 100%;
+            height: 10px; /* トラック（棒）の太さを大きく */
+            background: #cbd5e1; /* slate-300 */
+            border-radius: 9999px;
+            outline: none;
+            margin-top: 14px;    /* 上の文字との重なりを完全に防止 */
+            margin-bottom: 18px; /* 下の要素との重なりを完全に防止 */
+        }
+        
+        /* webkitブラウザ用つまみ（丸）の調整 */
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 24px; /* つまみ（丸）のサイズを大きくして触りやすく */
+            height: 24px;
+            border-radius: 50%;
+            background: #4f46e5; /* indigo-600 */
+            cursor: pointer;
+            border: 3px solid #ffffff;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+            transition: transform 0.1s ease, background-color 0.1s ease;
+        }
+        input[type="range"]::-webkit-slider-thumb:hover {
+            transform: scale(1.15);
+            background: #4338ca; /* indigo-700 */
+        }
+
+        /* Firefox用つまみ（丸）の調整 */
+        input[type="range"]::-moz-range-thumb {
+            width: 24px; /* つまみ（丸）のサイズを大きくして触りやすく */
+            height: 24px;
+            border-radius: 50%;
+            background: #4f46e5;
+            cursor: pointer;
+            border: 3px solid #ffffff;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+            transition: transform 0.1s ease, background-color 0.1s ease;
+        }
+        input[type="range"]::-moz-range-thumb:hover {
+            transform: scale(1.15);
+            background: #4338ca;
+        }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-screen flex flex-col">
+
+    <!-- ヘッダー（タイトル中央揃え、バッジと帽子のアイコンを削除） -->
+    <header class="bg-indigo-700 text-white shadow-md p-4">
+        <div class="container mx-auto text-center">
+            <h1 class="text-xl md:text-2xl font-bold">
+                <span>鉛直方向の物体の運動</span>
+            </h1>
+        </div>
+    </header>
+
+    <!-- メインコンテンツ -->
+    <main class="container mx-auto p-4 flex-grow flex flex-col gap-6">
+        
+        <!-- パソコンで見ているときに一度に（スクロールなしで）すべて見渡せるように2カラムグリッドを適用 -->
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+            
+            <!-- 左カラム（lg:col-span-7）: パラメータ設定 ＋ アニメーションキャンバス -->
+            <div class="lg:col-span-7 flex flex-col gap-6">
+                
+                <!-- パラメータ調整カード（3スライダーを1行に配置、スマホでも1行） -->
+                <div class="bg-white rounded-xl shadow-md p-5 border border-slate-200">
+                    <h2 class="text-lg font-bold mb-4 flex items-center gap-2 text-indigo-700 border-b pb-2">
+                        <i class="fa-solid fa-sliders"></i>
+                        <span>実験パラメータ</span>
+                    </h2>
+                    
+                    <!-- スライダーを縦で見ているときも、スライダーバーが綺麗に一列にそろうように h-8 sm:h-6 と whitespace-nowrap を追加 -->
+                    <div class="grid grid-cols-3 gap-3 md:gap-6">
+                        <!-- おもりの質量 -->
+                        <div>
+                            <div class="flex justify-between items-center mb-1 h-8 sm:h-6">
+                                <label class="text-[10px] sm:text-xs font-semibold text-slate-700">おもりの質量 $m$ :</label>
+                                <span class="text-indigo-600 font-bold text-[10px] sm:text-xs whitespace-nowrap" id="val-massA">0.50 kg</span>
+                            </div>
+                            <input type="range" id="massA" min="0.10" max="2.00" step="0.05" value="0.50" 
+                                   class="accent-indigo-600">
+                        </div>
+
+                        <!-- 初速度 -->
+                        <div>
+                            <div class="flex justify-between items-center mb-1 h-8 sm:h-6">
+                                <label class="text-[10px] sm:text-xs font-semibold text-slate-700">初速度 $v_0$ :</label>
+                                <span class="text-indigo-600 font-bold text-[10px] sm:text-xs whitespace-nowrap" id="val-massB">0.0 m/s</span>
+                            </div>
+                            <input type="range" id="massB" min="-10.0" max="10.0" step="0.5" value="0.0" 
+                                   class="accent-indigo-600">
+                        </div>
+
+                        <!-- 張力 T -->
+                        <div>
+                            <div class="flex justify-between items-center mb-1 h-8 sm:h-6">
+                                <label class="text-[10px] sm:text-xs font-semibold text-slate-700">張力 $T$ :</label>
+                                <span class="text-indigo-600 font-bold text-[10px] sm:text-xs whitespace-nowrap" id="val-force">9.8 N</span>
+                            </div>
+                            <input type="range" id="force" min="0.0" max="20.0" step="0.2" value="9.8" 
+                                   class="accent-indigo-600">
+                        </div>
+                    </div>
+
+                    <!-- ドロップダウンリストの横幅を選択肢にぴったり合わせる（w-auto shrink-0 に変更） -->
+                    <div class="mt-4 pt-3 border-t border-slate-100 flex flex-row items-center gap-1.5 w-full">
+                        <span class="text-[10px] sm:text-xs font-bold text-slate-700 whitespace-nowrap">表示設定:</span>
+                        <select id="select-focus" class="text-[10px] sm:text-xs py-2 px-1 sm:px-2 rounded-lg font-bold bg-white border border-slate-300 text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition duration-150 w-auto shrink-0">
+                            <option value="show-all">全て表示</option>
+                            <option value="all">力ベクトルのみ</option>
+                            <option value="A">速度ベクトルのみ</option>
+                            <option value="B">非表示</option>
+                        </select>
+                        
+                        <!-- スタート・一時停止切り替え時のボタン幅の揺れを防ぐため w-[85px] sm:w-[115px] で固定幅化 -->
+                        <button id="btn-play-pause" class="py-2 px-2 sm:px-3 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-bold transition duration-200 flex items-center justify-center gap-1 text-[10px] sm:text-xs whitespace-nowrap shrink-0 w-[85px] sm:w-[115px]">
+                            <i class="fa-solid fa-play" id="icon-play"></i>
+                            <span id="text-play">スタート</span>
+                        </button>
+                        <button id="btn-reset" class="py-2 px-2 sm:px-3 rounded-lg bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold transition duration-200 flex items-center justify-center gap-1 text-[10px] sm:text-xs whitespace-nowrap shrink-0">
+                            <i class="fa-solid fa-rotate-left"></i>
+                            <span>リセット</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- ① メインアニメーションキャンバス（鉛直運動に合わせて4:3のやや縦長に変更） -->
+                <div class="bg-white rounded-xl shadow-md p-4 border border-slate-200 flex flex-col">
+                    <div class="flex justify-between items-center mb-2">
+                        <span class="text-sm font-bold text-slate-700"><i class="fa-solid fa-film text-indigo-600 mr-1"></i>シミュレーション</span>
+                        <div class="text-xs text-slate-500 flex gap-3">
+                            <span>経過時間: <span id="timer" class="font-mono text-indigo-600 font-bold">0.00</span> 秒</span>
+                            <span>上昇距離: <span id="distance" class="font-mono text-indigo-600 font-bold">0.00</span> m</span>
+                            <span>現在速度: <span id="current-vel" class="font-mono text-indigo-600 font-bold">0.00</span> m/s</span>
+                        </div>
+                    </div>
+
+                    <!-- キャンバスコンテナ (背景を白に変更、縦横アスペクト比を4:3で固定してスマホでもはみ出しを防ぐ) -->
+                    <div class="relative bg-white rounded-lg overflow-hidden border border-slate-200 aspect-[4/3] w-full">
+                        <canvas id="physics-canvas" class="absolute inset-0 w-full h-full"></canvas>
+                        
+                        <!-- 画面端警告メッセージ（スマホ縦画面の極端に狭い高さでも確実に見切れないように文字サイズと余白を小型化） -->
+                        <div id="reset-alert" class="hidden absolute inset-0 bg-black/80 backdrop-blur-sm flex flex-col justify-center items-center text-white text-center p-2 sm:p-4">
+                            <p id="reset-alert-title" class="text-xs sm:text-lg font-bold mb-1 sm:mb-2">おもりが上端に到達しました！</p>
+                            <p class="text-[10px] sm:text-sm text-slate-300 mb-2 sm:mb-4">パラメータを変更するか、リセットして再度実験できます。</p>
+                            <button onclick="resetSimulation()" class="bg-indigo-600 hover:bg-indigo-700 px-3 py-1 sm:px-4 sm:py-2 rounded-lg text-[10px] sm:text-sm font-bold transition">
+                                <i class="fa-solid fa-rotate-left mr-1"></i> 最初からもう一度
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- 図中ベクトルの意味をアニメーションの枠の外（右下）にインライン配置 -->
+                    <div class="flex justify-end items-center mt-3 text-xs gap-4">
+                        <span class="font-bold text-slate-700">図中ベクトルの意味：</span>
+                        <div class="flex items-center gap-1.5">
+                            <span class="w-5 h-1.5 bg-red-500 inline-block rounded"></span>
+                            <span>張力 $T$</span>
+                        </div>
+                        <div class="flex items-center gap-1.5">
+                            <span class="w-5 h-1.5 bg-blue-500 inline-block rounded"></span>
+                            <span>重力 $W = mg$</span>
+                        </div>
+                        <div class="flex items-center gap-1.5">
+                            <span class="w-5 h-1.5 bg-amber-500 inline-block rounded"></span>
+                            <span>速度 $v$</span>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- 右カラム（lg:col-span-5）: グラフ表示領域。PC時は縦に2段重ねることで、左側エリアの高さに美しく揃えます -->
+            <div class="lg:col-span-5 w-full flex flex-col">
+                
+                <!-- ② グラフ表示領域（タイトルを「$v-t$グラフと$y-t$グラフ」に修正し、数式フォントを適用） -->
+                <div class="bg-white rounded-xl shadow-md p-5 border border-slate-200 h-full flex flex-col justify-between">
+                    <h3 class="text-md font-bold text-slate-700 mb-3 flex items-center justify-between">
+                        <span><i class="fa-solid fa-chart-line text-indigo-600 mr-1"></i>$v-t$グラフと$y-t$グラフ</span>
+                    </h3>
+                    <!-- スマホ縦画面では横並び(grid-cols-2), PC表示では高さを揃えて一度に見やすくするため縦重ね(lg:grid-cols-1)に最適化 -->
+                    <div class="grid grid-cols-2 lg:grid-cols-1 gap-4 flex-grow">
+                        <div class="h-44 sm:h-48 lg:h-40">
+                            <canvas id="chart-v"></canvas>
+                        </div>
+                        <div class="h-44 sm:h-48 lg:h-40">
+                            <canvas id="chart-x"></canvas> <!-- chart-a から chart-x に変更 -->
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+
+        </div>
+
+        <!-- 下部：スクロール領域。詳細な理論値テーブルと解説パネル -->
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 mt-2">
+            
+            <!-- ③ 理論値の表示・計算結果（理論値と計算式） -->
+            <div class="bg-white rounded-xl shadow-md p-5 border border-slate-200 lg:col-span-7">
+                <h2 class="text-lg font-bold mb-3 flex items-center gap-2 text-indigo-700 border-b pb-2">
+                    <i class="fa-solid fa-square-root-variable"></i>
+                    <span>理論値と計算式</span>
+                </h2>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 text-sm">
+                    <div class="space-y-3">
+                        <div class="p-3 bg-indigo-50 rounded-lg">
+                            <p class="font-bold text-slate-700 mb-1">運動方程式</p>
+                            <div class="space-y-1 text-slate-600">
+                                <div>$ma = T - mg$</div>
+                                <div class="text-xs text-slate-500 mt-1">（鉛直上向きを正とする）</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 各物理量の一覧表 -->
+                    <div class="flex flex-col justify-center">
+                        <p class="font-bold text-slate-700 mb-2 flex items-center gap-1">
+                            <i class="fa-solid fa-table"></i>
+                            <span>計算結果・各物理量の一覧</span>
+                        </p>
+                        <div class="overflow-hidden border border-slate-200 rounded-lg">
+                            <table class="min-w-full text-xs text-left text-slate-600">
+                                <thead class="bg-slate-100 text-slate-700 font-bold border-b border-slate-200">
+                                    <tr>
+                                        <th class="px-3 py-2.5">物理量</th>
+                                        <th class="px-3 py-2.5">関係式</th>
+                                        <th class="px-3 py-2.5">計算値</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr class="border-b border-slate-200 bg-white hover:bg-slate-50">
+                                        <td class="px-3 py-2.5 font-semibold text-slate-900">重力</td>
+                                        <td class="px-3 py-2.5 font-mono">$W = mg$</td>
+                                        <td class="px-3 py-2.5 font-mono text-blue-600 font-semibold" id="table-gravity">0.00 N</td>
+                                    </tr>
+                                    <tr class="border-b border-slate-200 bg-slate-50 hover:bg-slate-100">
+                                        <td class="px-3 py-2.5 font-semibold text-slate-900">張力</td>
+                                        <td class="px-3 py-2.5 font-mono">$T$</td>
+                                        <td class="px-3 py-2.5 font-mono text-red-600 font-semibold" id="table-pullForce">0.00 N</td>
+                                    </tr>
+                                    <tr class="border-b border-slate-200 bg-white hover:bg-slate-50">
+                                        <td class="px-3 py-2.5 font-semibold text-slate-900">合力</td>
+                                        <td class="px-3 py-2.5 font-mono">$F = T - mg$</td>
+                                        <td class="px-3 py-2.5 font-mono text-indigo-600 font-semibold" id="table-netForce">0.00 N</td>
+                                    </tr>
+                                    <tr class="bg-slate-50 hover:bg-slate-100">
+                                        <td class="px-3 py-2.5 font-bold text-indigo-900">生じる加速度</td>
+                                        <td class="px-3 py-2.5 font-mono">$a = F / m$</td>
+                                        <td class="px-3 py-2.5 font-bold font-mono text-indigo-600" id="table-accel">0.00 m/s²</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ④ 解説パネル (lg:col-span-5) -->
+            <div class="bg-indigo-50 border border-indigo-200 rounded-xl p-5 lg:col-span-5 flex flex-col justify-center">
+                <h3 class="font-bold text-indigo-900 mb-2 flex items-center gap-2">
+                    <i class="fa-solid fa-lightbulb"></i>
+                    <span>解説</span>
+                </h3>
+                <ul class="list-disc list-inside text-sm text-indigo-950 space-y-2">
+                    <li><strong>張力 $T$ と重力 $mg$ の関係：</strong> $T > mg$ のとき、物体は上向きに加速度 $a = \frac{T - mg}{m}$ で等加速度運動をします。</li>
+                    <li><strong>力のつり合い：</strong> $T = mg$ のとき、合力は $0$ となり、物体は静止し続けるか、または等速直線運動（加速度 $0$）を行います。</li>
+                    <li><strong>重力の方が大きい場合：</strong> $T < mg$ のとき、合力は下向きに働きます。物体が既に上昇中の場合は減速し、その後落下します（下端で停止します）。</li>
+                </ul>
+            </div>
+
+        </div>
+
+    </main>
+
+    <!-- フッター（ホーム、物理一覧ボタン、鈴木先生のコピーライト） -->
+    <footer class="bg-white py-8 border-t border-slate-200 mt-6">
+        <!--//20260810 <div class="container mx-auto px-4">
+            <div class="flex flex-col items-center gap-6 sm:gap-8 pt-6 sm:pt-8 border-t border-slate-100">
+                <div class="flex gap-4 sm:gap-6 text-sm font-bold">
+                    <a href="../6.0_home/home.html" class="flex items-center gap-2 px-6 sm:px-8 py-3 sm:py-4 bg-slate-800 text-white rounded-2xl hover:bg-slate-700 transition-colors">
+                        <i class="fa-solid fa-house"></i> ホーム
+                    </a>
+                    <a href="../6.1_physics_home/physics_home.html" class="flex items-center gap-2 px-6 sm:px-8 py-3 sm:py-4 bg-slate-800 text-white rounded-2xl hover:bg-slate-700 transition-colors">
+                        <i class="fa-solid fa-list"></i> 物理一覧
+                    </a>
+                </div>
+                <p class="text-[10px] sm:text-[11px] text-slate-400">Copyright &copy; 2021-2026 T.Suzuki</p>
+            </div>
+        </div>//20260810 -->
+    </footer>
+
+    <!-- JavaScript & 物理シミュレーションロジック -->
+    <script>
+        // ----------------- DOM要素 of 取得 -----------------
+        const canvas = document.getElementById('physics-canvas');
+        const ctx = canvas.getContext('2d');
+        const btnPlayPause = document.getElementById('btn-play-pause');
+        const btnReset = document.getElementById('btn-reset');
+        const iconPlay = document.getElementById('icon-play');
+        const textPlay = document.getElementById('text-play'); 
+        const resetAlert = document.getElementById('reset-alert');
+
+        // 表示設定セレクトボックス
+        const selectFocus = document.getElementById('select-focus');
+
+        // スライダー類
+        const sliderMass = document.getElementById('massA');
+        const sliderGravity = document.getElementById('massB'); // 初速度設定スライダーとして使用
+        const sliderForce = document.getElementById('force');
+
+        // 数値表示用
+        const valMass = document.getElementById('val-massA');
+        const valGravity = document.getElementById('val-massB'); // 初速度ラベル
+        const valForce = document.getElementById('val-force');
+
+        const timerEl = document.getElementById('timer');
+        const distanceEl = document.getElementById('distance');
+        const currentVelEl = document.getElementById('current-vel');
+
+        // ----------------- シミュレーション変数 -----------------
+        let isRunning = false;
+        let animationFrameId = null;
+
+        // 物理パラメータの状態
+        let mass = parseFloat(sliderMass.value);      // おもりの質量 m (kg)
+        let gravity = 9.8;                             // 重力加速度 g (m/s^2) 固定
+        let initVel = parseFloat(sliderGravity.value); // 初速度 v0 (m/s)
+        let pullForce = parseFloat(sliderForce.value); // 張力 T (N)
+        let focusMode = 'show-all'; // 'show-all' (ledger), 'all' (力のみ), 'A' (速度のみ), 'B' (非表示)
+
+        // 導出される理論値
+        let accel = 0;
+        let gravityForce = 0;
+        let netForce = 0;
+
+        // 初期高度 (初速度が上下どちらでも実験できるよう、中間に設定)
+        const initHeight = 1.0; 
+
+        // 動的変数 (リアルタイム変化)
+        let time = 0; // 経過時間 (s)
+        let posY_ball_m = initHeight; // 床からの高度 (m)
+        let vel = 0; // 現在速度 (m/s)
+
+        // 動的な限界値（おもりが画面外に完全に消え去るメートル換算高度）
+        let maxPosLimit = 2.5; // 最大高度制限 (m)
+        let minPosLimit = -0.83; // 完全に画面外に消えるメートル高度 (約-0.83m)
+
+        // ピクセルスケール
+        // 1m = 120px と定義
+        const meterScale = 120; 
+
+        // ----------------- グラフ (Chart.js) 原点「O」描画プラグイン -----------------
+        const originPlugin = {
+            id: 'originPlugin',
+            afterDraw: (chart) => {
+                const { ctx, chartArea: { left, bottom } } = chart;
+                ctx.save();
+                ctx.font = 'bold 12px sans-serif';
+                ctx.fillStyle = '#64748b'; // slate-500
+                // 左下（原点付近）の少し左下に「O」を描画する
+                ctx.fillText('O', left - 12, bottom + 14);
+                ctx.restore();
+            }
+        };
+
+        // ----------------- グラフ (Chart.js) データ定義 -----------------
+        let chartV, chartX;
+        let theoreticalVData = []; // 理想的なvt軌跡（実線で事前描画）
+        let theoreticalYData = []; // 理想的なyt軌跡（実線で事前描画）
+        let historyVData = []; // 実際のvt変化履歴（非描画）
+        let historyYData = []; // 実際のyt変化履歴（非描画）
+        let currentVData = []; // 現在位置プロット用
+        let currentXData = []; // 現在位置プロット用
+
+        function initCharts() {
+            const ctxV = document.getElementById('chart-v').getContext('2d');
+            const ctxX = document.getElementById('chart-x').getContext('2d');
+
+            chartV = new Chart(ctxV, {
+                type: 'line',
+                plugins: [originPlugin],
+                data: {
+                    datasets: [
+                        {
+                            label: 'v-tグラフ',
+                            data: theoreticalVData,
+                            borderColor: '#f59e0b', // 元の「実際の軌跡」のハッキリした色（Amber-500）に変更
+                            backgroundColor: 'rgba(245, 158, 11, 0.05)',
+                            borderWidth: 2.5,
+                            pointRadius: 0,
+                            fill: false, // 塗りつぶしをなくし、軌跡線のみのシンプルなデザインに変更
+                            tension: 0,
+                            order: 2
+                        },
+                        {
+                            label: '現在の速度',
+                            data: currentVData,
+                            borderColor: '#ef4444', // Red-500
+                            backgroundColor: '#ef4444',
+                            pointRadius: 6,
+                            pointHoverRadius: 6,
+                            showLine: false,
+                            order: 1
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: true, labels: { boxWidth: 10 } } },
+                    scales: {
+                        x: { 
+                            type: 'linear',
+                            position: 'bottom',
+                            title: { display: true, text: '時間 t (s)' }, 
+                            min: 0,
+                            max: 3.0,
+                            grid: { color: '#f1f5f9' },
+                            ticks: {
+                                callback: function(value) {
+                                    return value === 0 ? '' : value;
+                                }
+                            }
+                        },
+                        y: { 
+                            title: { display: true, text: '速度 v (m/s)' },
+                            min: -12, 
+                            max: 12, 
+                            grid: { color: '#f1f5f9' },
+                            ticks: {
+                                callback: function(value) {
+                                    return value === 0 ? '' : value;
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+
+            chartX = new Chart(ctxX, {
+                type: 'line',
+                plugins: [originPlugin],
+                data: {
+                    datasets: [
+                        {
+                            label: 'y-tグラフ',
+                            data: theoreticalYData,
+                            borderColor: '#6366f1', // 元の「実際の軌跡」のハッキリした色（Indigo-500）に変更
+                            backgroundColor: 'rgba(99, 102, 241, 0.05)',
+                            borderWidth: 2.5,
+                            pointRadius: 0,
+                            fill: false, // 塗りつぶしをなくし、軌跡線のみのシンプルなデザインに変更
+                            tension: 0.1,
+                            order: 2
+                        },
+                        {
+                            label: '現在の変位',
+                            data: currentXData,
+                            borderColor: '#ef4444',
+                            backgroundColor: '#ef4444',
+                            pointRadius: 6,
+                            pointHoverRadius: 6,
+                            showLine: false,
+                            order: 1
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: true, labels: { boxWidth: 10 } } },
+                    scales: {
+                        x: { 
+                            type: 'linear',
+                            position: 'bottom',
+                            title: { display: true, text: '時間 t (s)' }, 
+                            min: 0,
+                            max: 3.0,
+                            grid: { color: '#f1f5f9' },
+                            ticks: {
+                                callback: function(value) {
+                                    return value === 0 ? '' : value;
+                                }
+                            }
+                        },
+                        y: { 
+                            title: { display: true, text: '変位 y (m)' },
+                            min: -1.0, // 0から-1.0へ拡張。負の領域まで描画を可能に
+                            max: 3.0,
+                            grid: { color: '#f1f5f9' },
+                            ticks: {
+                                callback: function(value) {
+                                    return value === 0 ? '' : value;
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        // 動的なおおむりの完全はみ出し（画面外に消える）境界条件の更新
+        function updateLimits() {
+            const width = canvas.width / window.devicePixelRatio;
+            const height = canvas.height / window.devicePixelRatio;
+            const scale = width / 400;
+            const floorY = height - 50 * scale;
+            const radius = 25 * scale;
+            const scaledMeterScale = meterScale * scale;
+
+            // おもりの下端が画面上端(0)を超える物理高度
+            maxPosLimit = (floorY + radius) / scaledMeterScale;
+            // おもりの上端が画面下端(height)を超える物理高度
+            minPosLimit = (floorY - height - radius) / scaledMeterScale;
+        }
+
+        // 理想的な軌跡を事前計算してプロットする (クランプを一切行わず、綺麗な等加速度運動として描画)
+        function updateTheoreticalLines() {
+            theoreticalVData.length = 0;
+            theoreticalYData.length = 0;
+            
+            // 初速度、初期高度、加速度から単純に純粋な等加速度運動を計算
+            let tempNetForce = pullForce - (mass * gravity);
+            let tempAccel = tempNetForce / mass;
+
+            for (let step = 0; step <= 300; step++) {
+                const t = step * 0.01;
+                
+                // 等加速度直線運動の公式
+                const tempV = initVel + tempAccel * t;
+                const tempY = initHeight + initVel * t + 0.5 * tempAccel * t * t;
+
+                if (step % 5 === 0 || step === 300) {
+                    theoreticalVData.push({x: t, y: tempV});
+                    theoreticalYData.push({x: t, y: tempY});
+                }
+            }
+
+            chartV.update('none');
+            chartX.update('none');
+        }
+
+        // 現在値の赤いドットおよび履歴の更新
+        function updateCurrentPoints(t, v, y) {
+            // 履歴の追加
+            historyVData.push({x: t, y: v});
+            historyYData.push({x: t, y: y});
+
+            // 赤い現在位置の更新
+            currentVData.length = 0;
+            currentVData.push({x: t, y: v});
+
+            currentXData.length = 0;
+            currentXData.push({x: t, y: y});
+
+            chartV.update('none');
+            chartX.update('none');
+        }
+
+        // ----------------- 物理演算 -----------------
+        function calculatePhysics() {
+            gravityForce = mass * gravity;
+            netForce = pullForce - gravityForce;
+
+            // おもりの高度にクランプをかけず、単純に力に応じた加速度を計算
+            accel = netForce / mass;
+
+            // テーブル表示の更新
+            document.getElementById('table-gravity').innerText = `${gravityForce.toFixed(2)} N`;
+            document.getElementById('table-pullForce').innerText = `${pullForce.toFixed(2)} N`;
+            document.getElementById('table-netForce').innerText = `${netForce.toFixed(2)} N`;
+            document.getElementById('table-accel').innerText = `${accel.toFixed(2)} m/s²`;
+        }
+
+        // ----------------- 描画処理 (Canvas) -----------------
+        function resizeCanvas() {
+            const rect = canvas.parentNode.getBoundingClientRect();
+            canvas.width = rect.width * window.devicePixelRatio;
+            canvas.height = rect.height * window.devicePixelRatio;
+            ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
+            updateLimits(); // 限界境界の再決定
+            draw();
+        }
+
+        // 矢印（ベクトル）を描画するヘルパー関数 (alignLeftを追加して、ラベル位置の左右反転に対応)
+        function drawVector(startX, startY, length, color, label, isUp = false, scale = 1.0, alignLeft = false) {
+            if (Math.abs(length) < 3 * scale) return;
+
+            const arrowSize = 10 * scale; 
+            const endX = startX;
+            const endY = startY + length; // 鉛直方向の矢印にするためY方向を加算
+
+            ctx.beginPath();
+            ctx.strokeStyle = color;
+            ctx.lineWidth = 4 * scale; 
+            ctx.moveTo(startX, startY);
+            ctx.lineTo(endX, endY);
+            ctx.stroke();
+
+            // 矢の頭
+            ctx.beginPath();
+            ctx.fillStyle = color;
+            ctx.moveTo(endX, endY);
+            if (length > 0) {
+                // 下向き矢印
+                ctx.lineTo(endX - arrowSize / 1.5, endY - arrowSize);
+                ctx.lineTo(endX + arrowSize / 1.5, endY - arrowSize);
+            } else {
+                // 上向き矢印
+                ctx.lineTo(endX - arrowSize / 1.5, endY + arrowSize);
+                ctx.lineTo(endX + arrowSize / 1.5, endY + arrowSize);
+            }
+            ctx.fill();
+
+            // ラベル配置
+            ctx.fillStyle = color;
+            const fontSize = 12 * scale;
+            ctx.font = `bold ${fontSize}px system-ui`;
+            
+            // alignLeft(重力ベクトル)のときは、おもりの左端(半径25px)に完全に重ならないよう、少し大きめのオフセットにする
+            const offsetX = alignLeft ? 32 * scale : 10 * scale; 
+            
+            if (alignLeft) {
+                // 左寄せ（テキストの右端を矢印の左に合わせる）
+                ctx.textAlign = 'right';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(label, endX - offsetX, endY - (length > 0 ? 5 : -5) * scale);
+            } else {
+                // 右寄せ（デフォルト）
+                ctx.textAlign = 'left';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(label, endX + offsetX, endY - (length > 0 ? 5 : -5) * scale);
+            }
+        }
+
+        function draw() {
+            const width = canvas.width / window.devicePixelRatio;
+            const height = canvas.height / window.devicePixelRatio;
+
+            ctx.clearRect(0, 0, width, height);
+
+            // 背景を完全に白色にする
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(0, 0, width, height);
+
+            const scale = width / 400; // 基準幅を400pxとしてスケーリング
+
+            // 地面の位置（床の描画は消去し、基準線の位置定義のみ維持）
+            const floorY = height - 50 * scale;
+
+            // 目盛り線 (負の範囲を0より下にも追加して描画)
+            ctx.textAlign = 'left';
+            ctx.strokeStyle = 'rgba(0, 0, 0, 0.1)';
+            ctx.lineWidth = 1 * scale;
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
+            ctx.font = `${10 * scale}px monospace`;
+            
+            const scaledMeterScale = meterScale * scale;
+            // メートル単位（-1.0mから3.0mまで0.5m刻み）で正確にループを回し、ピクセル位置に換算して描画する
+            for (let h = -1.0; h <= 3.0; h += 0.5) {
+                const yPix = h * scaledMeterScale;
+                const drawY = floorY - yPix;
+                if (drawY < 0 || drawY > height) continue;
+                
+                ctx.beginPath();
+                ctx.moveTo(0, drawY);
+                ctx.lineTo(10 * scale, drawY);
+                ctx.stroke();
+                
+                ctx.fillText(`${h.toFixed(1)}m`, 15 * scale, drawY + 4 * scale);
+            }
+
+            // 正の向きを示すガイド表示を左側に描画 (重ならないよう positiveArrowX を 65 * scale に調整)
+            const positiveArrowX = 65 * scale;
+            const positiveArrowYStart = floorY - 180 * scale;
+            const positiveArrowYEnd = floorY - 230 * scale;
+
+            ctx.beginPath();
+            ctx.strokeStyle = '#475569'; // slate-600
+            ctx.lineWidth = 2 * scale;
+            ctx.moveTo(positiveArrowX, positiveArrowYStart);
+            ctx.lineTo(positiveArrowX, positiveArrowYEnd);
+            ctx.stroke();
+
+            // 正の向きを示す矢印の頭
+            const pArrowSize = 6 * scale;
+            ctx.beginPath();
+            ctx.fillStyle = '#475569';
+            ctx.moveTo(positiveArrowX, positiveArrowYEnd);
+            ctx.lineTo(positiveArrowX - pArrowSize / 1.5, positiveArrowYEnd + pArrowSize);
+            ctx.lineTo(positiveArrowX + pArrowSize / 1.5, positiveArrowYEnd + pArrowSize);
+            ctx.fill();
+
+            // テキストラベル
+            ctx.fillStyle = '#475569';
+            ctx.font = `bold ${10 * scale}px system-ui`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'bottom';
+            ctx.fillText('正', positiveArrowX, positiveArrowYEnd - 4 * scale);
+            ctx.textBaseline = 'top';
+            ctx.fillText('+', positiveArrowX, positiveArrowYStart + 2 * scale);
+
+            // おもりのサイズ定義
+            const radius = 25 * scale;
+            const ballX = width / 2;
+            const ballY = floorY - radius - (posY_ball_m * scaledMeterScale);
+
+            // 1. 上部から伸びる支持糸の描画
+            ctx.beginPath();
+            ctx.strokeStyle = '#94a3b8'; // slate-400
+            ctx.lineWidth = 2 * scale;
+            ctx.moveTo(ballX, 0);
+            ctx.lineTo(ballX, ballY - radius);
+            ctx.stroke();
+
+            // 2. おもり（単色の薄いグレーの球）の描画
+            ctx.beginPath();
+            ctx.arc(ballX, ballY, radius, 0, Math.PI * 2);
+            ctx.fillStyle = '#e2e8f0'; // 薄いグレーの単色
+            ctx.shadowColor = 'rgba(0,0,0,0.15)';
+            ctx.shadowBlur = 8 * scale;
+            ctx.shadowOffsetY = 4 * scale;
+            ctx.fill();
+            
+            ctx.shadowColor = 'transparent'; // 影設定のリセット
+            ctx.shadowBlur = 0;
+            ctx.shadowOffsetY = 0;
+
+            // おもりの枠線
+            ctx.strokeStyle = '#1e293b';
+            ctx.lineWidth = 2 * scale;
+            ctx.beginPath();
+            ctx.arc(ballX, ballY, radius, 0, Math.PI * 2);
+            ctx.stroke();
+
+            // 球体内部に質量ラベルを描画
+            ctx.fillStyle = '#0f172a';
+            ctx.font = `bold ${10 * scale}px sans-serif`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(`${mass.toFixed(2)}kg`, ballX, ballY);
+
+            // 3. 各ベクトルの描画（物体の前に配置されるよう、おもりの描画より後に実行）
+            const isFocusForce = (focusMode === 'show-all' || focusMode === 'all');
+            const isFocusVel = (focusMode === 'show-all' || focusMode === 'A');
+
+            // 張力 T (上向きベクトル: 長さを負にする)
+            if (isFocusForce && pullForce > 0) {
+                const forceVectorLength = -Math.min(100 * scale, pullForce * 5.5 * scale);
+                drawVector(ballX, ballY - radius, forceVectorLength, '#ef4444', `T = ${pullForce.toFixed(1)}N`, true, scale);
+            }
+
+            // 重力 W = mg (下向きベクトル、作用点をおもりの中心 ballY に変更、alignLeft=true で左寄せに指定)
+            if (isFocusForce && gravityForce > 0) {
+                const gravityVectorLength = Math.min(100 * scale, gravityForce * 5.5 * scale);
+                drawVector(ballX, ballY, gravityVectorLength, '#3b82f6', `W = ${gravityForce.toFixed(1)}N`, false, scale, true);
+            }
+
+            // 速度ベクトル v (おもりの横に黄色い矢印で描画)
+            if (isFocusVel && Math.abs(vel) > 0.01) {
+                const velVectorLength = -vel * 8 * scale; // 上向き上昇を上向きの矢印（マイナス方向）にする
+                drawVector(ballX + radius + 10 * scale, ballY, velVectorLength, '#f59e0b', `v = ${vel.toFixed(1)}m/s`, true, scale);
+            }
+        }
+
+        // ----------------- シミュレーションループ -----------------
+        let lastTime = 0;
+
+        function updateSimulation(timestamp) {
+            if (!isRunning) return;
+
+            if (!lastTime) lastTime = timestamp;
+            // 物理シミュレーションの経過時間を0.4倍にして全体的な動きをゆっくり観察しやすくする
+            const dt = ((timestamp - lastTime) / 1000) * 0.4; 
+            lastTime = timestamp;
+
+            calculatePhysics();
+
+            // 速度と高度の純粋な等加速度計算 (境界のクランプを完全に排除し不連続を防止)
+            vel += accel * dt;
+            posY_ball_m += vel * dt;
+            time += dt;
+
+            // グラフへのプロット
+            updateCurrentPoints(time, vel, posY_ball_m);
+
+            // UI数値の更新
+            timerEl.innerText = time.toFixed(2);
+            distanceEl.innerText = posY_ball_m.toFixed(2);
+            currentVelEl.innerText = vel.toFixed(2);
+
+            draw();
+
+            // 終了判定（おもりが完全に上端に到達した、または完全に下端から隠れた、または時間が3.0秒に達した場合）
+            const isOverUpper = (posY_ball_m >= maxPosLimit);
+            const isOverLower = (posY_ball_m <= minPosLimit);
+            const isTimeOut = (time >= 3.0);
+
+            if (isOverUpper || isOverLower || isTimeOut) {
+                // 強制クランプ (vel=0 等) を行わず、等加速度の値を保持したままシミュレーションを一時停止
+                pauseSimulation();
+                
+                // スタートボタンの無効化と終了表示
+                btnPlayPause.disabled = true;
+                btnPlayPause.classList.add('opacity-50', 'cursor-not-allowed');
+                iconPlay.className = "fa-solid fa-ban";
+                textPlay.innerText = "終了";
+
+                if (isOverUpper) {
+                    document.getElementById('reset-alert-title').innerText = "おもりが上端に到達しました！";
+                } else if (isOverLower) {
+                    document.getElementById('reset-alert-title').innerText = "おもりが下端に到達しました！";
+                } else {
+                    document.getElementById('reset-alert-title').innerText = "実験時間が3.0秒に達しました！";
+                }
+                resetAlert.classList.remove('hidden');
+                
+                updateCurrentPoints(time, vel, posY_ball_m);
+                draw();
+            } else {
+                animationFrameId = requestAnimationFrame(updateSimulation);
+            }
+        }
+
+        function startSimulation() {
+            isRunning = true;
+            lastTime = 0;
+            iconPlay.className = "fa-solid fa-pause";
+            textPlay.innerText = "一時停止";
+            animationFrameId = requestAnimationFrame(updateSimulation);
+        }
+
+        function pauseSimulation() {
+            isRunning = false;
+            iconPlay.className = "fa-solid fa-play";
+            textPlay.innerText = "スタート";
+            if (animationFrameId) {
+                cancelAnimationFrame(animationFrameId);
+            }
+        }
+
+        function toggleSimulation() {
+            if (isRunning) {
+                pauseSimulation();
+            } else {
+                startSimulation();
+            }
+        }
+
+        function resetSimulation() {
+            pauseSimulation();
+            
+            // UIコントロールのリセット
+            btnPlayPause.disabled = false;
+            btnPlayPause.classList.remove('opacity-50', 'cursor-not-allowed');
+            iconPlay.className = "fa-solid fa-play";
+            textPlay.innerText = "スタート";
+
+            resetAlert.classList.add('hidden');
+            time = 0;
+            posY_ball_m = initHeight; // 初期高度に設定
+            vel = initVel;           // 初期速度を初速度に設定
+            
+            timerEl.innerText = "0.00";
+            distanceEl.innerText = posY_ball_m.toFixed(2);
+            currentVelEl.innerText = vel.toFixed(2);
+
+            // グラフデータのクリアと初期点配置
+            historyVData.length = 0;
+            historyYData.length = 0;
+            historyVData.push({x: 0, y: vel});
+            historyYData.push({x: 0, y: posY_ball_m});
+            
+            calculatePhysics();
+            updateTheoreticalLines(); // 理想的な予測線の更新と再表示
+            updateCurrentPoints(0, vel, posY_ball_m);
+            draw();
+        }
+
+        // ----------------- 表示切り替え -----------------
+        function setFocusMode(mode) {
+            focusMode = mode;
+            selectFocus.value = mode;
+            draw();
+        }
+
+        // ----------------- イベントリスナー -----------------
+        function handleSliderChange() {
+            resetSimulation();
+
+            mass = parseFloat(sliderMass.value);
+            initVel = parseFloat(sliderGravity.value); // 重力加速度スライダーから初速度を取得
+            pullForce = parseFloat(sliderForce.value);
+
+            // ラベルの更新
+            valMass.innerText = `${mass.toFixed(2)} kg`;
+            valGravity.innerText = `${initVel.toFixed(1)} m/s`;
+            valForce.innerText = `${pullForce.toFixed(1)} N`;
+
+            calculatePhysics();
+            updateTheoreticalLines(); // 理想的な予測線の事前描画を連動
+            updateCurrentPoints(0, initVel, posY_ball_m);
+            draw();
+        }
+
+        sliderMass.addEventListener('input', handleSliderChange);
+        sliderGravity.addEventListener('input', handleSliderChange);
+        sliderForce.addEventListener('input', handleSliderChange);
+
+        btnPlayPause.addEventListener('click', toggleSimulation);
+        btnReset.addEventListener('click', resetSimulation);
+
+        selectFocus.addEventListener('change', (e) => setFocusMode(e.target.value));
+
+        window.addEventListener('resize', resizeCanvas);
+
+        // ----------------- 初期化処理 -----------------
+        window.onload = function() {
+            resizeCanvas();
+            calculatePhysics();
+            initCharts();
+            resetSimulation();
+        };
+    </script>
+</body>
+</html>

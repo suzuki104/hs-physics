@@ -1,0 +1,428 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>2物体の衝突と円周率</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        canvas {
+            background: #f8fafc;
+            border-bottom: 4px solid #475569;
+        }
+        .position-axis {
+            height: 40px;
+            position: relative;
+            background: #e2e8e0;
+            border-radius: 4px;
+            margin: 10px 0;
+            overflow: hidden;
+        }
+        .axis-line {
+            position: absolute;
+            top: 50%;
+            left: 5%;
+            right: 5%;
+            height: 2px;
+            background: #94a3b8;
+            transform: translateY(-50%);
+        }
+        .pos-marker {
+            position: absolute;
+            top: 50%;
+            height: 12px;
+            border-radius: 2px;
+            transform: translate(0, -50%);
+            transition: left 0.1s ease-out, width 0.1s ease-out;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+            z-index: 20;
+            border-width: 2px;
+            border-style: solid;
+        }
+        .wall-marker {
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            width: 4px;
+            background: #1e293b;
+            transition: left 0.1s ease-out;
+            z-index: 10;
+        }
+        #leftLimitLabel {
+            position: absolute;
+            left: 5px;
+            bottom: 2px;
+            font-size: 9px;
+            color: #64748b;
+            font-family: monospace;
+        }
+        .math {
+            font-family: "Times New Roman", Times, serif;
+            font-style: italic;
+        }
+        .speed-value {
+            white-space: nowrap;
+            overflow: hidden;
+            display: flex;
+            align-items: baseline;
+            justify-content: flex-end;
+        }
+    </style>
+</head>
+<body class="bg-slate-100 min-h-screen flex flex-col font-sans">
+
+    <header class="bg-slate-800 text-white p-4 shadow-md">
+        <h1 class="text-xl font-bold flex items-center gap-2">
+            2物体の衝突と円周率
+        </h1>
+    </header>
+
+    <main class="flex-grow flex flex-col items-center justify-center p-4">
+        <div class="relative w-full max-w-5xl bg-white rounded-xl shadow-2xl overflow-hidden">
+            
+            <!-- タイトルとアニメーションの間の注釈エリア -->
+            <div class="bg-slate-50 px-4 py-3 text-xs text-slate-600 border-b border-slate-200">
+                ※衝突回数…赤色の物体が、青の物体と壁に衝突した回数の合計の数<br>
+                ※赤の物体と青の物体、赤の物体と壁はいずれも弾性衝突します。
+            </div>
+
+            <div class="relative">
+                <div class="absolute top-4 left-4 flex flex-col gap-2 z-20">
+                    <div class="bg-blue-600 text-white px-4 py-2 rounded-full text-lg font-bold shadow-lg border-2 border-white flex items-center gap-3">
+                        衝突回数: <span id="collisionCount">0</span>
+                        <span id="finishText" class="hidden bg-yellow-400 text-slate-900 px-2 py-0.5 rounded text-sm animate-pulse">衝突終了</span>
+                    </div>
+                </div>
+
+                <canvas id="canvas" class="w-full h-[350px]"></canvas>
+            </div>
+
+            <div class="px-6 py-2 bg-white">
+                <div class="text-[10px] font-bold text-slate-500 uppercase mb-1 flex justify-between">
+                    <span>全体表示</span>
+                </div>
+                <div class="position-axis" id="axisContainer">
+                    <div class="axis-line"></div>
+                    <div id="leftLimitLabel">0</div>
+                    <div id="wallPosMarker" class="wall-marker"></div>
+                    <div id="m1Marker" class="pos-marker bg-blue-600 border-blue-600"></div>
+                    <div id="m2Marker" class="pos-marker bg-red-600 border-red-600"></div>
+                </div>
+            </div>
+
+            <div class="p-6 grid grid-cols-1 lg:grid-cols-3 gap-6 border-t border-slate-200 bg-slate-50">
+                
+                <div class="lg:col-span-2 space-y-6">
+                    <div>
+                        <label class="block text-sm font-bold text-slate-700 mb-3">
+                            左の物体の質量 (<span class="math">m₁</span>): <span id="m1Display" class="text-blue-600 text-lg font-mono">100</span> kg
+                        </label>
+                        <div class="flex flex-wrap gap-2">
+                            <button class="mass-btn bg-white border border-blue-600 text-blue-600 hover:bg-blue-50 px-4 py-2 rounded-md text-sm font-medium transition-colors" data-value="1">1</button>
+                            <button class="mass-btn bg-blue-600 text-white border border-blue-600 px-4 py-2 rounded-md text-sm font-medium transition-colors" data-value="100">100</button>
+                            <button class="mass-btn bg-white border border-blue-600 text-blue-600 hover:bg-blue-50 px-4 py-2 rounded-md text-sm font-medium transition-colors" data-value="10000">10,000</button>
+                            <button class="mass-btn bg-white border border-blue-600 text-blue-600 hover:bg-blue-50 px-4 py-2 rounded-md text-sm font-medium transition-colors" data-value="1000000">1,000,000</button>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-4">
+                        <div class="bg-blue-50 p-3 rounded-lg border border-blue-200 overflow-hidden">
+                            <span class="block text-xs font-bold text-blue-700 uppercase tracking-wider">物体1 速度 (<span class="math">v₁</span>)</span>
+                            <div class="speed-value">
+                                <span id="v1Display" class="inline-block min-w-[120px] text-right text-xl font-mono font-bold text-blue-900">0.000</span>
+                                <span class="ml-1 text-xs text-blue-700">m/s</span>
+                            </div>
+                        </div>
+                        <div class="bg-red-50 p-3 rounded-lg border border-red-200 overflow-hidden">
+                            <span class="block text-xs font-bold text-red-700 uppercase tracking-wider">物体2 速度 (<span class="math">v₂</span>)</span>
+                            <div class="speed-value">
+                                <span id="v2Display" class="inline-block min-w-[120px] text-right text-xl font-mono font-bold text-red-900 transition-all duration-75">0.000</span>
+                                <span id="v2Unit" class="ml-1 text-xs text-red-700">m/s</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-bold text-slate-700 mb-1">
+                            シミュレーション速度
+                        </label>
+                        <div class="flex items-center gap-2">
+                            <span class="text-xs text-slate-500 font-bold">遅い</span>
+                            <input type="range" id="speedSlider" min="1" max="2000" value="100" class="flex-grow h-2 bg-slate-300 rounded-lg appearance-none cursor-pointer accent-slate-700">
+                            <span class="text-xs text-slate-500 font-bold">速い</span>
+                        </div>
+                    </div>
+                    <div class="flex gap-2">
+                        <button id="startBtn" class="flex-1 bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 rounded-lg transition-all flex items-center justify-center gap-2 text-sm shadow-md">
+                            <span id="btnText">スタート</span>
+                        </button>
+                        <button id="resetBtn" class="flex-1 bg-slate-700 hover:bg-slate-600 text-white font-bold py-3 rounded-lg transition-all flex items-center justify-center gap-2 text-sm">
+                            リセット
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="flex gap-4 mt-8 mb-4">
+            <!--//20260810<a href="../6.0_home/home.html" class="bg-slate-600 hover:bg-slate-700 text-white font-bold py-2 px-6 rounded-lg transition-colors shadow-md text-sm">
+                ホーム
+            </a>
+            <a href="../6.1_physics_home/physics_home.html" class="bg-slate-600 hover:bg-slate-700 text-white font-bold py-2 px-6 rounded-lg transition-colors shadow-md text-sm">
+                物理一覧
+            </a>//20260810-->
+        </div>
+
+        <footer class="mt-4 mb-8 text-slate-500 text-xs">
+            Copyright &copy; 2021-<span id="currentYear"></span> T.Suzuki
+        </footer>
+    </main>
+
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        const collisionDisplay = document.getElementById('collisionCount');
+        const finishText = document.getElementById('finishText');
+        const m1Display = document.getElementById('m1Display');
+        const v1Display = document.getElementById('v1Display');
+        const v2Display = document.getElementById('v2Display');
+        const v2Unit = document.getElementById('v2Unit');
+        const speedSlider = document.getElementById('speedSlider');
+        const startBtn = document.getElementById('startBtn');
+        const resetBtn = document.getElementById('resetBtn');
+        const massButtons = document.querySelectorAll('.mass-btn');
+        
+        const m1Marker = document.getElementById('m1Marker');
+        const m2Marker = document.getElementById('m2Marker');
+        const wallPosMarker = document.getElementById('wallPosMarker');
+        const leftLimitLabel = document.getElementById('leftLimitLabel');
+
+        let m1 = 100;
+        const m2 = 1;
+        let v1 = 0;
+        let v2 = 0;
+        let x1, x2;
+        const size1 = 60;
+        const size2 = 40;
+        const initialV1 = 20; 
+        
+        const wallOffset = 40; 
+        const worldScale = 1.0; 
+        const worldOffsetX = 0;  
+
+        let collisions = 0;
+        let isRunning = false;
+        let animationId;
+
+        document.getElementById('currentYear').innerText = new Date().getFullYear();
+
+        function init() {
+            cancelAnimationFrame(animationId);
+            resize();
+            m1Display.innerText = m1.toLocaleString();
+            finishText.classList.add('hidden');
+            
+            if (m1 >= 1000000) speedSlider.max = 100000;
+            else if (m1 >= 10000) speedSlider.max = 10000;
+            else speedSlider.max = 2000;
+            
+            v1 = 0;
+            v2 = 0;
+            collisions = 0; // 速度表示ロジックのためにここでリセット
+            updateSpeedDisplays();
+            
+            const wallX = canvas.width - wallOffset;
+            x2 = wallX - size2 - 50; 
+            x1 = x2 - 200; 
+            
+            collisionDisplay.innerText = collisions;
+            updateIndicators();
+            draw();
+            updateUI();
+        }
+
+        function resize() {
+            const container = canvas.parentElement;
+            canvas.width = container.clientWidth;
+            canvas.height = 350;
+        }
+
+        function updateSpeedDisplays() {
+            // 表示値を計算値の1/10にし、全て小数点第3位まで表示
+            // 初期状態（運動前：v1=0 かつ 衝突0）の場合は initialV1 を表示基準にする
+            const displayV1 = (v1 === 0 && collisions === 0) ? (initialV1 / 10) : (v1 / 10);
+            const displayV2 = v2 / 10;
+
+            v1Display.innerText = displayV1.toFixed(3);
+            v2Display.innerText = displayV2.toFixed(3);
+            
+            // レイアウト調整: 全てのケースでサイズを一定に保つ
+            v2Display.style.fontSize = '1.25rem'; 
+            v2Unit.style.fontSize = '0.75rem'; 
+            v2Display.style.minWidth = '120px';
+            v1Display.style.fontSize = '1.25rem';
+        }
+
+        function updateIndicators() {
+            const wallX = canvas.width - wallOffset;
+            const minX = Math.min(x1, 0);
+            const maxX = wallX;
+            const range = maxX - minX;
+            
+            const normalize = (val) => ((val - minX) / range) * 90 + 5;
+
+            const p1 = normalize(x1);
+            const p2 = normalize(x2);
+            const pw = normalize(wallX);
+
+            const w1 = (size1 / range) * 90;
+            const w2 = (size2 / range) * 90;
+
+            m1Marker.style.left = `${p1}%`;
+            m1Marker.style.width = `${w1}%`;
+            m2Marker.style.left = `${p2}%`;
+            m2Marker.style.width = `${w2}%`;
+            wallPosMarker.style.left = `${pw}%`;
+            
+            leftLimitLabel.innerText = Math.round(minX);
+        }
+
+        function update() {
+            const totalSubSteps = parseInt(speedSlider.value);
+            const dt = 0.0001; 
+
+            for (let s = 0; s < totalSubSteps; s++) {
+                x1 += v1 * dt;
+                x2 += v2 * dt;
+
+                if (x1 + size1 >= x2 && v1 > v2) {
+                    const u1 = v1;
+                    const u2 = v2;
+                    v1 = ((m1 - m2) * u1 + 2 * m2 * u2) / (m1 + m2);
+                    v2 = (2 * m1 * u1 + (m2 - m1) * u2) / (m1 + m2);
+                    x1 = x2 - size1; 
+                    collisions++;
+                }
+
+                const wallX = canvas.width - wallOffset;
+                if (x2 + size2 >= wallX && v2 > 0) {
+                    v2 = -v2; 
+                    x2 = wallX - size2;
+                    collisions++;
+                }
+            }
+            
+            if (v1 <= 0 && v2 <= 0 && v1 <= v2 && collisions > 0) {
+                finishText.classList.remove('hidden');
+            } else {
+                finishText.classList.add('hidden');
+            }
+
+            collisionDisplay.innerText = collisions;
+            updateSpeedDisplays();
+            updateIndicators();
+        }
+
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.save();
+            ctx.translate(worldOffsetX, 0);
+            ctx.scale(worldScale, 1);
+
+            const floorY = 300;
+            const wallX = canvas.width - wallOffset;
+
+            ctx.strokeStyle = '#cbd5e1';
+            ctx.lineWidth = 4;
+            ctx.beginPath();
+            ctx.moveTo(-20000, floorY);
+            ctx.lineTo(canvas.width + 500, floorY);
+            ctx.stroke();
+
+            ctx.fillStyle = '#1e293b';
+            ctx.fillRect(wallX, 50, 10, floorY - 50);
+
+            ctx.fillStyle = '#3b82f6';
+            ctx.fillRect(x1, floorY - size1, size1, size1);
+            ctx.strokeStyle = '#1e40af';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(x1, floorY - size1, size1, size1);
+            
+            ctx.fillStyle = '#ef4444';
+            ctx.fillRect(x2, floorY - size2, size2, size2);
+            ctx.strokeStyle = '#991b1b';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(x2, floorY - size2, size2, size2);
+
+            ctx.fillStyle = '#334155';
+            ctx.font = `bold 12px sans-serif`;
+            ctx.textAlign = 'center';
+            if (x1 + size1 > 0) {
+                ctx.fillText(`${m1.toLocaleString()}kg`, x1 + size1/2, floorY - size1 - 10);
+            }
+            if (x2 + size2 > 0) {
+                ctx.fillText(`1kg`, x2 + size2/2, floorY - size2 - 10);
+            }
+            ctx.restore();
+        }
+
+        function loop() {
+            if (isRunning) {
+                update();
+                draw();
+                animationId = requestAnimationFrame(loop);
+            }
+        }
+
+        function updateUI() {
+            if (isRunning) {
+                document.getElementById('btnText').innerText = '一時停止';
+                startBtn.classList.replace('bg-blue-600', 'bg-amber-500');
+            } else {
+                document.getElementById('btnText').innerText = 'スタート';
+                startBtn.classList.replace('bg-amber-500', 'bg-blue-600');
+            }
+            
+            massButtons.forEach(btn => {
+                const btnValue = parseInt(btn.dataset.value);
+                if (btnValue === m1) {
+                    btn.className = 'mass-btn bg-blue-600 text-white border border-blue-600 px-4 py-2 rounded-md text-sm font-medium transition-colors shadow-sm';
+                } else {
+                    btn.className = 'mass-btn bg-white text-blue-600 border border-blue-600 hover:bg-blue-50 px-4 py-2 rounded-md text-sm font-medium transition-colors';
+                }
+            });
+        }
+
+        massButtons.forEach(btn => {
+            btn.addEventListener('click', () => {
+                m1 = parseInt(btn.dataset.value);
+                isRunning = false;
+                init(); 
+            });
+        });
+
+        startBtn.addEventListener('click', () => {
+            isRunning = !isRunning;
+            if (isRunning) {
+                if (collisions === 0 && v1 === 0) v1 = initialV1;
+                loop();
+            }
+            updateUI();
+        });
+
+        resetBtn.addEventListener('click', () => {
+            isRunning = false;
+            updateUI();
+            init();
+        });
+
+        window.addEventListener('resize', () => { 
+            if (!isRunning) init(); 
+            else resize();
+        });
+        window.onload = init;
+    </script>
+</body>
+</html>

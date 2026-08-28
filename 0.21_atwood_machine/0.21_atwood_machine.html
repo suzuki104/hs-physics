@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>アドウッドの器械</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+    <style>
+        canvas {
+            background: #f8fafc;
+            display: block;
+            margin: 0 auto;
+        }
+        input[type="range"] {
+            accent-color: #2563eb;
+        }
+    </style>
+</head>
+<body class="bg-gray-50 font-sans text-gray-900">
+    <div class="max-w-4xl mx-auto p-4 md:p-6">
+        <header class="mb-6 text-center">
+            <h1 class="text-3xl font-extrabold text-blue-900">アドウッドの器械</h1>
+        </header>
+
+        <!-- パラメータ設定 -->
+        <div class="bg-white p-6 rounded-t-2xl shadow-lg border border-gray-200 border-b-0">
+            <h2 class="font-bold text-lg mb-6 flex items-center gap-2">
+                <span class="w-2 h-6 bg-blue-600 rounded-full"></span>
+                パラメータ設定
+            </h2>
+            
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+                <div>
+                    <div class="flex justify-between mb-1">
+                        <label class="text-sm font-semibold">質量 $m_1$ (左)</label>
+                        <span class="text-blue-600 font-bold"><span id="m1-val">2.0</span> kg</span>
+                    </div>
+                    <input type="range" id="m1-range" min="0.1" max="10" step="0.1" value="2.0" class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer">
+                </div>
+
+                <div>
+                    <div class="flex justify-between mb-1">
+                        <label class="text-sm font-semibold">質量 $m_2$ (右)</label>
+                        <span class="text-blue-600 font-bold"><span id="m2-val">3.0</span> kg</span>
+                    </div>
+                    <input type="range" id="m2-range" min="0.1" max="10" step="0.1" value="3.0" class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer">
+                </div>
+
+                <div>
+                    <div class="flex justify-between mb-1">
+                        <label class="text-sm font-semibold">物体2(青)の初速度(下向き正)</label>
+                        <span class="text-blue-600 font-bold"><span id="v0-val">0.0</span> m/s</span>
+                    </div>
+                    <input type="range" id="v0-range" min="-5" max="5" step="0.5" value="0" class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer">
+                </div>
+            </div>
+        </div>
+
+        <!-- 操作ボタン (統合スタート/停止ボタン + 独立リセットボタン) -->
+        <div class="bg-white p-4 shadow-md border border-gray-200 border-b-0">
+            <!-- flex-nowrapを追加して一行に固定 -->
+            <div class="flex flex-nowrap items-center justify-center gap-2 md:gap-4">
+                <!-- スタート/一時停止 統合ボタン -->
+                <button id="toggle-btn" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 md:px-10 rounded-xl transition-all transform active:scale-95 shadow-lg shadow-blue-200 flex items-center gap-1 md:gap-2 flex-1 max-w-[200px] justify-center text-sm md:text-base whitespace-nowrap">
+                    <span id="toggle-icon">▶</span> <span id="toggle-text">スタート</span>
+                </button>
+                <!-- 独立したリセットボタン -->
+                <button id="reset-btn" class="bg-rose-500 hover:bg-rose-600 text-white font-bold py-3 px-4 md:px-8 rounded-xl transition-all shadow-md flex items-center gap-1 md:gap-2 flex-1 max-w-[160px] justify-center text-sm md:text-base whitespace-nowrap">
+                    <span>↺</span> リセット
+                </button>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 gap-6 mb-8">
+            <div class="relative bg-white p-4 rounded-b-2xl shadow-xl border border-gray-200">
+                <canvas id="simCanvas" class="w-full rounded-xl border border-gray-100"></canvas>
+            </div>
+        </div>
+
+        <div id="learning-points" class="p-6 bg-white rounded-2xl shadow-md border border-gray-200 text-gray-800 mb-8">
+            <h2 class="font-bold text-xl mb-4 text-blue-900 border-b pb-2">学習のポイント</h2>
+            <div class="grid md:grid-cols-2 gap-6">
+                <ul class="list-disc ml-5 space-y-2 text-sm md:text-base">
+                    <li>運動方程式:
+                        <div class="my-1 py-1 px-3 bg-gray-50 rounded border text-sm italic">
+                            $m_1 a = T - m_1 g$ <br>
+                            $m_2 a = m_2 g - T$
+                        </div>
+                    </li>
+                    <li>加速度の公式: $a = \frac{m_2 - m_1}{m_1 + m_2} g$</li>
+                </ul>
+                <ul class="list-disc ml-5 space-y-2 text-sm md:text-base">
+                    <li>質量差が大きいほど加速度 $a$ は大きくなり、$g$ に近づきます。</li>
+                    <li>張力 $T$ は両方の物体に等しく働きます。</li>
+                </ul>
+            </div>
+        </div>
+
+        <footer class="mt-12 mb-8 text-center">
+            <div class="flex justify-center gap-4 mb-6">
+            <!--//20260810
+                <a href="../6.0_home/home.html" class="bg-gray-800 hover:bg-gray-900 text-white font-bold py-2 px-6 rounded-lg transition-colors shadow-md">ホーム</a>
+                <a href="../6.1_physics_home/physics_home.html" class="bg-gray-800 hover:bg-gray-900 text-white font-bold py-2 px-6 rounded-lg transition-colors shadow-md">物理一覧</a>
+            //20260810-->
+            </div>
+            <p class="text-gray-500 text-sm" id="copyright"></p>
+        </footer>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('simCanvas');
+        const ctx = canvas.getContext('2d');
+
+        // Constants
+        const G = 9.80665;
+        const SCALE = 60; 
+        const PULLEY_Y = 100;
+        const PULLEY_R = 60; 
+        const ROPE_OFFSET = PULLEY_R;
+        const TOTAL_ROPE = 600; 
+
+        // State variables
+        let m1 = 2.0;
+        let m2 = 3.0;
+        let v0 = 0.0;
+        let time = 0;
+        let running = false;
+        let animationId;
+        let atBoundary = false; 
+
+        let y2 = 350; 
+        let velocity = 0;
+        let acceleration = 0;
+        let tension = 0;
+
+        const m1Range = document.getElementById('m1-range');
+        const m2Range = document.getElementById('m2-range');
+        const v0Range = document.getElementById('v0-range');
+        const m1Val = document.getElementById('m1-val');
+        const m2Val = document.getElementById('m2-val');
+        const v0Val = document.getElementById('v0-val');
+        
+        const toggleBtn = document.getElementById('toggle-btn');
+        const toggleIcon = document.getElementById('toggle-icon');
+        const toggleText = document.getElementById('toggle-text');
+        const resetBtn = document.getElementById('reset-btn');
+
+        function init() {
+            canvas.width = 900; 
+            canvas.height = 700;
+            
+            const currentYear = new Date().getFullYear();
+            document.getElementById('copyright').innerHTML = `Copyright &copy; 2021-${currentYear} T.Suzuki`;
+            
+            updatePhysics();
+            draw();
+            
+            renderMathInElement(document.body, {
+                delimiters: [
+                    {left: '$$', right: '$$', display: true},
+                    {left: '$', right: '$', display: false}
+                ],
+                throwOnError : false
+            });
+        }
+
+        // ボタンの表示状態を更新
+        function updateButtonUI() {
+            if (atBoundary) {
+                toggleIcon.textContent = '▶';
+                toggleText.textContent = 'スタート';
+                toggleBtn.disabled = true;
+                toggleBtn.classList.add('opacity-50', 'cursor-not-allowed');
+            } else {
+                toggleBtn.disabled = false;
+                toggleBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+                if (running) {
+                    toggleIcon.textContent = 'Ⅱ';
+                    toggleText.textContent = '一時停止';
+                    toggleBtn.classList.replace('bg-blue-600', 'bg-amber-500');
+                    toggleBtn.classList.replace('hover:bg-blue-700', 'hover:bg-amber-600');
+                } else {
+                    toggleIcon.textContent = '▶';
+                    toggleText.textContent = time > 0 ? '再開' : 'スタート';
+                    toggleBtn.classList.replace('bg-amber-500', 'bg-blue-600');
+                    toggleBtn.classList.replace('hover:bg-amber-600', 'hover:bg-blue-700');
+                }
+            }
+        }
+
+        function updatePhysics() {
+            // パラメータ変更時は自動リセット
+            if (running || atBoundary || time > 0) {
+                resetLogic();
+            }
+
+            m1 = parseFloat(m1Range.value);
+            m2 = parseFloat(m2Range.value);
+            v0 = parseFloat(v0Range.value);
+
+            m1Val.textContent = m1.toFixed(1);
+            m2Val.textContent = m2.toFixed(1);
+            v0Val.textContent = v0.toFixed(1);
+
+            acceleration = G * (m2 - m1) / (m1 + m2);
+            tension = (2 * m1 * m2 * G) / (m1 + m2);
+            
+            if (!running && time === 0) {
+                velocity = v0;
+                atBoundary = false;
+            }
+
+            updateButtonUI();
+            if (!running) {
+                draw();
+            }
+        }
+
+        function resetLogic() {
+            running = false;
+            atBoundary = false;
+            time = 0;
+            y2 = 350;
+            cancelAnimationFrame(animationId);
+        }
+
+        function reset() {
+            resetLogic();
+            updatePhysics();
+            draw();
+        }
+
+        function getBlockSide(mass) {
+            return 40 + Math.sqrt(mass) * 15;
+        }
+
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            const centerX = canvas.width / 2;
+            
+            // Ceiling
+            ctx.strokeStyle = '#334155';
+            ctx.lineWidth = 6;
+            ctx.lineCap = 'round';
+            ctx.beginPath();
+            ctx.moveTo(centerX - 150, 30);
+            ctx.lineTo(centerX + 150, 30);
+            ctx.stroke();
+
+            // Pulley support
+            ctx.lineWidth = 10;
+            ctx.beginPath();
+            ctx.moveTo(centerX, 30);
+            ctx.lineTo(centerX, PULLEY_Y);
+            ctx.stroke();
+
+            // Pulley
+            ctx.fillStyle = '#cbd5e1';
+            ctx.beginPath();
+            ctx.arc(centerX, PULLEY_Y, PULLEY_R, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.strokeStyle = '#475569';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+
+            // Center point
+            ctx.fillStyle = '#475569';
+            ctx.beginPath();
+            ctx.arc(centerX, PULLEY_Y, 5, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // Positions
+            const y1 = TOTAL_ROPE - y2 + PULLEY_Y; 
+            
+            // Draw rope
+            ctx.lineWidth = 3;
+            ctx.strokeStyle = '#475569';
+            ctx.beginPath();
+            ctx.moveTo(centerX - ROPE_OFFSET, PULLEY_Y);
+            ctx.lineTo(centerX - ROPE_OFFSET, y1);
+            ctx.arc(centerX, PULLEY_Y, PULLEY_R, Math.PI, 0);
+            ctx.moveTo(centerX + ROPE_OFFSET, PULLEY_Y);
+            ctx.lineTo(centerX + ROPE_OFFSET, y2);
+            ctx.stroke();
+
+            // Draw Blocks
+            drawBlockBody(centerX - ROPE_OFFSET, y1, m1, 'm₁', '#ef4444', 'left');
+            drawBlockBody(centerX + ROPE_OFFSET, y2, m2, 'm₂', '#3b82f6', 'right');
+
+            // Draw Vectors
+            drawBlockVectors(centerX - ROPE_OFFSET, y1, m1, -velocity, 'left');
+            drawBlockVectors(centerX + ROPE_OFFSET, y2, m2, velocity, 'right');
+        }
+
+        function drawBlockBody(x, y, mass, label, color, sideName) {
+            const side = getBlockSide(mass);
+            ctx.fillStyle = color;
+            ctx.fillRect(x - side/2, y, side, side);
+            ctx.strokeStyle = '#0f172a';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(x - side/2, y, side, side);
+            
+            ctx.fillStyle = '#1e293b';
+            ctx.font = 'bold 20px serif';
+            const labelMargin = 8;
+            const labelX = sideName === 'left' ? x - side/2 - labelMargin : x + side/2 + labelMargin;
+            ctx.textAlign = sideName === 'left' ? 'right' : 'left';
+            ctx.fillText(label, labelX, y + side/2 + 7);
+        }
+
+        function drawBlockVectors(x, y, mass, currentV, sideName) {
+            const side = getBlockSide(mass);
+            const forceScale = 2; 
+            drawVector(x, y, -tension * forceScale, '#6366f1', 'T', 5, false);
+
+            const velScale = 15;
+            const textX = sideName === 'left' ? x - side/2 - 50 : x + side/2 + 50;
+            if (Math.abs(currentV) > 0.01 || (!running && time === 0 && Math.abs(currentV) > 0)) {
+                drawVector(textX, y + side/2, currentV * velScale, '#10b981', 'v', 4, false);
+            }
+
+            const gravityLabel = sideName === 'left' ? 'm₁g' : 'm₂g';
+            drawVector(x, y + side/2, mass * G * forceScale, '#dc2626', gravityLabel, 5, true); 
+        }
+
+        function drawVector(x, y, length, color, label, width, outline) {
+            if (Math.abs(length) < 2) return;
+            const headSize = 16; 
+            const sign = length > 0 ? 1 : -1;
+
+            if (outline) {
+                ctx.strokeStyle = 'white';
+                ctx.lineWidth = width + 4;
+                ctx.beginPath();
+                ctx.moveTo(x, y);
+                ctx.lineTo(x, y + length);
+                ctx.stroke();
+            }
+
+            ctx.strokeStyle = color;
+            ctx.fillStyle = color;
+            ctx.lineWidth = width;
+            ctx.lineCap = 'round';
+            ctx.beginPath();
+            ctx.moveTo(x, y);
+            ctx.lineTo(x, y + length);
+            ctx.stroke();
+            
+            ctx.beginPath();
+            ctx.moveTo(x - headSize/1.8, y + length - headSize * sign);
+            ctx.lineTo(x + headSize/1.8, y + length - headSize * sign);
+            ctx.lineTo(x, y + length);
+            ctx.fill();
+
+            if (label) {
+                ctx.fillStyle = color;
+                ctx.font = 'italic bold 18px serif';
+                ctx.textAlign = 'left';
+                ctx.shadowBlur = 4;
+                ctx.shadowColor = 'white';
+                ctx.fillText(label, x + 16, y + length / 2 + 6);
+                ctx.shadowBlur = 0;
+            }
+        }
+
+        function animate() {
+            if (!running || atBoundary) return;
+
+            const dt = 0.016; 
+            time += dt;
+
+            const nextVelocity = velocity + acceleration * dt;
+            const nextY2 = y2 + nextVelocity * SCALE * dt;
+            const nextY1 = TOTAL_ROPE - nextY2 + PULLEY_Y;
+
+            const pulleyLimit = PULLEY_Y + 60; 
+
+            if (nextY2 <= pulleyLimit || nextY1 <= pulleyLimit) {
+                running = false;
+                atBoundary = true; 
+                velocity = 0;
+                
+                if (nextY2 <= pulleyLimit) {
+                    y2 = pulleyLimit;
+                } else if (nextY1 <= pulleyLimit) {
+                    y2 = TOTAL_ROPE + PULLEY_Y - pulleyLimit;
+                }
+                updateButtonUI();
+            } else {
+                velocity = nextVelocity;
+                y2 = nextY2;
+            }
+
+            draw();
+
+            if (running) {
+                animationId = requestAnimationFrame(animate);
+            }
+        }
+
+        // イベントリスナー
+        m1Range.addEventListener('input', updatePhysics);
+        m2Range.addEventListener('input', updatePhysics);
+        v0Range.addEventListener('input', updatePhysics);
+
+        toggleBtn.addEventListener('click', () => {
+            if (atBoundary) return; 
+            
+            if (running) {
+                // 一時停止
+                running = false;
+                cancelAnimationFrame(animationId);
+            } else {
+                // スタート / 再開
+                running = true;
+                animate();
+            }
+            updateButtonUI();
+        });
+
+        resetBtn.addEventListener('click', reset);
+
+        window.onload = init;
+    </script>
+</body>
+</html>

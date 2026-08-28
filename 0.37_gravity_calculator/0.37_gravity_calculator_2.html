@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>重力加速度計算機|高校物理アニメーション教材</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+        body { font-family: 'Inter', 'sans-serif'; }
+        .tab-active { @apply bg-indigo-600 text-white shadow-sm; }
+        .tab-inactive { @apply text-slate-600 hover:bg-slate-100; }
+    </style>
+    <script>
+        window.MathJax = {
+            tex: { inlineMath: [['$', '$'], ['\\(', '\\)']] }
+        };
+    </script>
+</head>
+<body class="bg-slate-50 min-h-screen text-slate-800">
+    <div class="max-w-md mx-auto p-6">
+        <header class="mb-8 text-center">
+            <h1 class="text-2xl font-bold text-indigo-700">重力加速度計算機</h1>
+            <p class="text-sm text-slate-500">地理的位置に基づく理論値の算出</p>
+        </header>
+
+        <!-- Mode Selector -->
+        <div class="flex bg-white p-1 rounded-xl shadow-sm mb-6 border border-slate-200">
+            <button id="mode-auto" class="flex-1 py-2 text-sm font-semibold rounded-lg transition-all bg-indigo-600 text-white shadow-sm">
+                自動取得 (GPS)
+            </button>
+            <button id="mode-manual" class="flex-1 py-2 text-sm font-semibold rounded-lg transition-all text-slate-600 hover:bg-slate-100">
+                手動入力
+            </button>
+        </div>
+
+        <!-- Main Display -->
+        <div class="bg-white rounded-2xl shadow-xl p-8 mb-6 border border-slate-100 relative overflow-hidden">
+            <div class="absolute top-0 left-0 w-full h-1 bg-indigo-500"></div>
+            <div class="text-center">
+                <span class="text-sm font-medium text-slate-400 uppercase tracking-wider">計算された重力加速度</span>
+                <div class="mt-2 flex items-baseline justify-center gap-1">
+                    <span id="gravity-result" class="text-5xl font-black text-slate-900 leading-none">9.80665</span>
+                    <span class="text-xl font-bold text-slate-500 italic font-serif text-gray-500">m/s²</span>
+                </div>
+            </div>
+
+            <div id="status-box" class="mt-6 p-3 rounded-lg text-xs font-medium text-center bg-indigo-50 text-indigo-600">
+                位置情報を入力してください
+            </div>
+        </div>
+
+        <!-- Inputs Section -->
+        <div class="space-y-4">
+            <div id="manual-inputs" class="hidden space-y-3 animate-in fade-in slide-in-from-top-4 duration-300">
+                <!-- DMS/Decimal Toggle -->
+                <div class="flex justify-end mb-1">
+                    <div class="inline-flex p-1 bg-slate-200 rounded-lg text-[10px]">
+                        <button id="use-decimal" class="px-2 py-1 rounded bg-white shadow-sm font-bold">10進法(°)</button>
+                        <button id="use-dms" class="px-2 py-1 rounded text-slate-500">度分秒(DMS)</button>
+                    </div>
+                </div>
+
+                <div id="decimal-input-group" class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-500 mb-1">緯度 (°)</label>
+                        <input type="number" id="input-lat" step="any" placeholder="35.6895" class="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none transition-all">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-500 mb-1">経度 (°)</label>
+                        <input type="number" id="input-lon" step="any" placeholder="139.6917" class="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none transition-all">
+                    </div>
+                </div>
+
+                <div id="dms-input-group" class="hidden space-y-3">
+                    <div class="p-3 bg-slate-50 rounded-xl border border-slate-200">
+                        <label class="block text-xs font-semibold text-slate-500 mb-2">緯度 (度・分・秒)</label>
+                        <div class="grid grid-cols-3 gap-2">
+                            <input type="number" id="dms-lat-d" placeholder="度" class="px-2 py-2 rounded border border-slate-200 text-sm">
+                            <input type="number" id="dms-lat-m" placeholder="分" class="px-2 py-2 rounded border border-slate-200 text-sm">
+                            <input type="number" id="dms-lat-s" placeholder="秒" class="px-2 py-2 rounded border border-slate-200 text-sm">
+                        </div>
+                    </div>
+                    <div class="p-3 bg-slate-50 rounded-xl border border-slate-200">
+                        <label class="block text-xs font-semibold text-slate-500 mb-2">経度 (度・分・秒)</label>
+                        <div class="grid grid-cols-3 gap-2">
+                            <input type="number" id="dms-lon-d" placeholder="度" class="px-2 py-2 rounded border border-slate-200 text-sm">
+                            <input type="number" id="dms-lon-m" placeholder="分" class="px-2 py-2 rounded border border-slate-200 text-sm">
+                            <input type="number" id="dms-lon-s" placeholder="秒" class="px-2 py-2 rounded border border-slate-200 text-sm">
+                        </div>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-slate-500 mb-1">標高 / 高度 (m)</label>
+                    <input type="number" id="input-alt" step="any" placeholder="0" class="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none transition-all">
+                </div>
+                <button id="calc-manual" class="w-full bg-slate-900 text-white py-4 rounded-xl font-bold hover:bg-slate-800 transition-colors shadow-lg active:scale-95 duration-75">
+                    計算を実行
+                </button>
+            </div>
+
+            <button id="get-location" class="w-full flex items-center justify-center gap-2 bg-indigo-600 text-white py-4 rounded-xl font-bold hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-200 active:scale-95 duration-75">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg>
+                現在地を取得して計算
+            </button>
+        </div>
+
+        <!-- Information / Source -->
+        <div class="mt-10 space-y-4">
+            <div class="p-4 bg-slate-100 rounded-xl border border-slate-200">
+                <h2 class="text-sm font-bold flex items-center gap-2 mb-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+                    計算モデルとソース
+                </h2>
+                <p class="text-xs text-slate-600 leading-relaxed">
+                    本アプリは<strong>国際重力公式 1967 (IGF67)</strong> および、測地成果 <strong>WGS84</strong> 楕円体に基づく正規重力公式を用いて計算しています。
+                </p>
+                <div class="mt-3 p-3 bg-white rounded-lg text-[11px] font-mono text-slate-500 leading-relaxed border border-slate-200 overflow-x-auto">
+                    $$g = g_0 (1 + 0.0053024 \sin^2 \phi - 0.0000058 \sin^2 2\phi) - 3.086 \times 10^{-6} h$$
+                    $\phi$: 緯度, $h$: 標高(m), $g_0$: 赤道上の標準重力加速度
+                </div>
+
+                <div class="mt-4 space-y-2">
+                    <h3 class="text-xs font-bold text-slate-700">理論値と計測値のズレについて</h3>
+                    <p class="text-[11px] text-slate-600 leading-tight">
+                        本計算機による理論値と実際の計測値には、以下の要因による「重力異常」が生じます。
+                    </p>
+                    <ul class="text-[11px] text-slate-600 list-disc list-inside space-y-1 ml-1">
+                        <li><strong>ブーゲー補正の影響</strong>: 観測点と海抜0mの間にある岩石層の質量による重力増加。日本国内の平坦地では一般的に $0.0001 \sim 0.0005 \, m/s^2$ 程度の増加要因となります。</li>
+                        <li><strong>地形補正の影響</strong>: 周囲の山や谷による質量分布の偏り。急峻な山岳地帯では $-0.0001 \, m/s^2$ 前後の減少要因となることがあります。</li>
+                        <li><strong>地殻変動・密度異常</strong>: 地下構造の密度差により、最大で $\pm 0.001 \, m/s^2$ 程度の変動が生じる場合があります。</li>
+                    </ul>
+                </div>
+
+                <p class="text-[10px] mt-3 text-slate-400 italic">
+                    ソース: 測地学審議会、国際測地学協会 (IAG) 公表値
+                </p>
+            </div>
+        </div>
+
+        <!-- Footer Section -->
+        <div class="flex flex-col items-center gap-6 sm:gap-8 pt-6 sm:pt-8 border-t border-slate-100 mt-8">
+            <div class="flex gap-4 sm:gap-6 text-sm font-bold">
+                <a href="../6.0_home/home.html" class="flex items-center gap-2 px-6 sm:px-8 py-3 sm:py-4 bg-slate-800 text-white rounded-2xl hover:bg-slate-700 transition-colors">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
+                    ホーム
+                </a>
+                <a href="../6.1_physics_home/physics_home.html" class="flex items-center gap-2 px-6 sm:px-8 py-3 sm:py-4 bg-slate-800 text-white rounded-2xl hover:bg-slate-700 transition-colors">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"></line><line x1="8" y1="12" x2="21" y2="12"></line><line x1="8" y1="18" x2="21" y2="18"></line><line x1="3" y1="6" x2="3.01" y2="6"></line><line x1="3" y1="12" x2="3.01" y2="12"></line><line x1="3" y1="18" x2="3.01" y2="18"></line></svg>
+                    物理一覧
+                </a>
+            </div>
+            <p class="text-[10px] sm:text-[11px] text-slate-400">Copyright &copy; 2021-2025 T.Suzuki</p>
+        </div>
+    </div>
+
+    <script>
+        const gravityDisplay = document.getElementById('gravity-result');
+        const statusBox = document.getElementById('status-box');
+        const btnAuto = document.getElementById('mode-auto');
+        const btnManual = document.getElementById('mode-manual');
+        const manualInputs = document.getElementById('manual-inputs');
+        const btnGetLocation = document.getElementById('get-location');
+        const btnCalcManual = document.getElementById('calc-manual');
+
+        // Input Mode Toggles
+        const btnDecimal = document.getElementById('use-decimal');
+        const btnDMS = document.getElementById('use-dms');
+        const decimalGroup = document.getElementById('decimal-input-group');
+        const dmsGroup = document.getElementById('dms-input-group');
+
+        let currentMode = 'auto';
+        let isDMS = false;
+
+        // DMS to Decimal helper
+        function dmsToDecimal(d, m, s) {
+            return (parseFloat(d) || 0) + (parseFloat(m) || 0) / 60 + (parseFloat(s) || 0) / 3600;
+        }
+
+        // Calculation Logic
+        function calculateGravity(lat, alt) {
+            const phi = lat * (Math.PI / 180); 
+            const g0 = 9.780327; 
+            
+            const sinPhi = Math.sin(phi);
+            const sin2Phi = Math.sin(2 * phi);
+            
+            let g = g0 * (1 + 0.0053024 * Math.pow(sinPhi, 2) - 0.0000058 * Math.pow(sin2Phi, 2));
+            const freeAirCorrection = 0.000003086 * alt;
+            
+            return g - freeAirCorrection;
+        }
+
+        function updateUI(val, msg, colorClass = 'text-indigo-600') {
+            gravityDisplay.innerText = val.toFixed(6);
+            statusBox.innerText = msg;
+            statusBox.className = `mt-6 p-3 rounded-lg text-xs font-medium text-center bg-opacity-10 bg-indigo-500 ${colorClass}`;
+        }
+
+        // Mode Switching
+        btnAuto.onclick = () => {
+            currentMode = 'auto';
+            btnAuto.className = "flex-1 py-2 text-sm font-semibold rounded-lg transition-all bg-indigo-600 text-white shadow-sm";
+            btnManual.className = "flex-1 py-2 text-sm font-semibold rounded-lg transition-all text-slate-600 hover:bg-slate-100";
+            manualInputs.classList.add('hidden');
+            btnGetLocation.classList.remove('hidden');
+        };
+
+        btnManual.onclick = () => {
+            currentMode = 'manual';
+            btnManual.className = "flex-1 py-2 text-sm font-semibold rounded-lg transition-all bg-indigo-600 text-white shadow-sm";
+            btnAuto.className = "flex-1 py-2 text-sm font-semibold rounded-lg transition-all text-slate-600 hover:bg-slate-100";
+            manualInputs.classList.remove('hidden');
+            btnGetLocation.classList.add('hidden');
+        };
+
+        // DMS Toggle
+        btnDecimal.onclick = () => {
+            isDMS = false;
+            btnDecimal.className = "px-2 py-1 rounded bg-white shadow-sm font-bold text-slate-800";
+            btnDMS.className = "px-2 py-1 rounded text-slate-500";
+            decimalGroup.classList.remove('hidden');
+            dmsGroup.classList.add('hidden');
+        };
+
+        btnDMS.onclick = () => {
+            isDMS = true;
+            btnDMS.className = "px-2 py-1 rounded bg-white shadow-sm font-bold text-slate-800";
+            btnDecimal.className = "px-2 py-1 rounded text-slate-500";
+            decimalGroup.classList.add('hidden');
+            dmsGroup.classList.remove('hidden');
+        };
+
+        // GPS Action
+        btnGetLocation.onclick = () => {
+            if (!navigator.geolocation) {
+                updateUI(9.80665, "お使いのブラウザは位置情報をサポートしていません", "text-red-500");
+                return;
+            }
+
+            statusBox.innerText = "位置情報を取得中...";
+            
+            navigator.geolocation.getCurrentPosition(
+                (pos) => {
+                    const lat = pos.coords.latitude;
+                    const alt = pos.coords.altitude || 0;
+                    const g = calculateGravity(lat, alt);
+                    updateUI(g, `取得完了: 緯度 ${lat.toFixed(4)}°, 標高 ${alt.toFixed(1)}m`);
+                },
+                (err) => {
+                    updateUI(9.80665, "位置情報の取得に失敗しました。手動入力を試してください。", "text-red-500");
+                },
+                { enableHighAccuracy: true }
+            );
+        };
+
+        // Manual Action
+        btnCalcManual.onclick = () => {
+            let lat, alt = parseFloat(document.getElementById('input-alt').value) || 0;
+
+            if (isDMS) {
+                lat = dmsToDecimal(
+                    document.getElementById('dms-lat-d').value,
+                    document.getElementById('dms-lat-m').value,
+                    document.getElementById('dms-lat-s').value
+                );
+            } else {
+                lat = parseFloat(document.getElementById('input-lat').value);
+            }
+            
+            if (isNaN(lat) || lat < -90 || lat > 90) {
+                alert("有効な緯度を入力してください");
+                return;
+            }
+
+            const g = calculateGravity(lat, alt);
+            updateUI(g, `手動入力による計算結果 (緯度: ${lat.toFixed(6)}°, 標高: ${alt}m)`);
+        };
+    </script>
+</body>
+</html>

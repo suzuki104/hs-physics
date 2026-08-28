@@ -1,0 +1,597 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>斜面への斜方投射</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        window.MathJax = {
+            tex: { inlineMath: [['$', '$'], ['\\(', '\\)']] },
+            chtml: { displayAlign: 'left' }
+        };
+    </script>
+    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <style>
+        body { background-color: #f8fafc; font-family: 'sans-serif'; }
+        canvas { background-color: white; border-radius: 8px; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); }
+        .slider-container { display: flex; flex-direction: column; gap: 2px; }
+        .graph-container { background: white; border-radius: 8px; padding: 12px; border: 1px solid #e2e8f0; }
+        input[disabled] { opacity: 0.5; cursor: not-allowed; }
+        button:disabled { opacity: 0.6; cursor: not-allowed; background-color: #94a3b8 !important; }
+    </style>
+</head>
+<body class="p-4 md:p-8">
+    <div class="max-w-7xl mx-auto">
+        <header class="mb-6 text-center">
+            <h1 class="text-2xl font-bold text-slate-800 font-sans">斜面への斜方投射</h1>
+            <p class="text-slate-600 font-sans">斜面上の点Oから初速度 $v_0$、斜面に対する角度 $\theta$ で投げ上げた物体の運動</p>
+        </header>
+
+        <div class="grid grid-cols-1 lg:grid-cols-4 gap-8">
+            <!-- Settings Panel -->
+            <div class="lg:col-span-1 space-y-6 bg-white p-6 rounded-xl shadow-sm border border-slate-200 h-fit">
+                <!-- ①「設定をはじめに戻す」を最上部に移動 -->
+                <button id="resetSettingsBtn" class="w-full py-2 bg-blue-50 hover:bg-blue-100 text-blue-600 text-xs font-bold rounded-lg border border-blue-200 transition-colors">
+                    設定をはじめに戻す
+                </button>
+
+                <!-- ②チェックボックスを移動 -->
+                <div class="space-y-2">
+                    <label class="flex items-center gap-2 cursor-pointer">
+                        <input type="checkbox" id="showComponents" checked>
+                        <span class="text-sm font-medium text-slate-700">運動中に速度ベクトルを表示</span>
+                    </label>
+                    <label class="flex items-center gap-2 cursor-pointer">
+                        <input type="checkbox" id="showGuide" checked>
+                        <span class="text-sm font-medium text-slate-700">予測軌道を表示</span>
+                    </label>
+                </div>
+
+                <div class="slider-container">
+                    <label class="text-sm font-semibold text-slate-700">
+                        斜面の傾角 $\alpha$：<span id="slopeAngleVal">30°</span>
+                    </label>
+                    <input type="range" id="slopeAngle" min="0" max="60" value="30" class="w-full cursor-pointer">
+                </div>
+
+                <div class="slider-container">
+                    <label class="text-sm font-semibold text-slate-700">
+                        投射角（斜面から） $\theta$：<span id="launchAngleVal">45°</span>
+                    </label>
+                    <input type="range" id="launchAngle" min="10" max="80" value="45" class="w-full cursor-pointer">
+                </div>
+
+                <div class="slider-container">
+                    <label class="text-sm font-semibold text-slate-700">
+                        初速度 $v_0$：<span id="velocityVal">10.0</span> m/s
+                    </label>
+                    <input type="range" id="velocity" min="30" max="150" value="100" class="w-full cursor-pointer">
+                </div>
+            </div>
+
+            <!-- Main Display Area -->
+            <div class="lg:col-span-3 flex flex-col gap-4">
+                <canvas id="canvas" class="w-full h-[400px]"></canvas>
+                
+                <!-- Buttons Area -->
+                <div class="grid grid-cols-2 gap-4">
+                    <button id="fireBtn" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-xl shadow-sm transition-all text-lg">
+                        スタート
+                    </button>
+                    <button id="resetBtn" class="bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold py-3 px-4 rounded-xl shadow-sm transition-all text-lg">
+                        リセット
+                    </button>
+                </div>
+
+                <!-- Axis Rotation Slider -->
+                <div class="bg-blue-50 p-4 rounded-xl border border-blue-100 flex items-center gap-4">
+                    <div class="slider-container flex-1">
+                        <label class="text-sm font-bold text-blue-700">
+                            表示軸の回転 $\phi$：<span id="axisRotationVal">0°</span>
+                        </label>
+                        <input type="range" id="axisRotation" min="0" max="90" value="0" class="w-full cursor-pointer">
+                    </div>
+                </div>
+                
+                <!-- Graphs Grid -->
+                <div class="grid grid-cols-2 gap-3">
+                    <div class="graph-container">
+                        <h3 class="text-lg font-bold mb-1 text-slate-600 text-center">$x - t$</h3>
+                        <canvas id="graphPosX" class="w-full h-[150px] bg-slate-50"></canvas>
+                    </div>
+                    <div class="graph-container">
+                        <h3 class="text-lg font-bold mb-1 text-slate-600 text-center">$y - t$</h3>
+                        <canvas id="graphPosY" class="w-full h-[150px] bg-slate-50"></canvas>
+                    </div>
+                    <div class="graph-container">
+                        <h3 class="text-lg font-bold mb-1 text-slate-600 text-center">$v_x - t$</h3>
+                        <canvas id="graphVelX" class="w-full h-[150px] bg-slate-50"></canvas>
+                    </div>
+                    <div class="graph-container">
+                        <h3 class="text-lg font-bold mb-1 text-slate-600 text-center">$v_y - t$</h3>
+                        <canvas id="graphVelY" class="w-full h-[150px] bg-slate-50"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <footer class="mt-12 pt-8 border-t border-slate-200 flex flex-col items-center gap-6">
+            <div class="flex gap-4"> <!--//20260810 
+                <a href="../6.0_home/home.html" class="bg-slate-800 hover:bg-slate-900 text-white px-6 py-2 rounded-full text-sm font-bold transition text-center min-w-[100px]">ホーム</a>
+                <a href="../6.1_physics_home/physics_home.html" class="bg-slate-800 hover:bg-slate-900 text-white px-6 py-2 rounded-full text-sm font-bold transition text-center min-w-[100px]">物理一覧</a>
+            </div> //20260810 -->
+            <p id="copyright" class="text-slate-400 text-xs"></p>
+        </footer>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        const gCanvases = {
+            posX: document.getElementById('graphPosX'),
+            posY: document.getElementById('graphPosY'),
+            velX: document.getElementById('graphVelX'),
+            velY: document.getElementById('graphVelY')
+        };
+        
+        const fireBtn = document.getElementById('fireBtn');
+        const resetBtn = document.getElementById('resetBtn');
+        const resetSettingsBtn = document.getElementById('resetSettingsBtn');
+
+        const slopeInput = document.getElementById('slopeAngle');
+        const launchInput = document.getElementById('launchAngle');
+        const velocityInput = document.getElementById('velocity');
+        const axisRotationInput = document.getElementById('axisRotation');
+        const showComponents = document.getElementById('showComponents');
+        const showGuide = document.getElementById('showGuide');
+
+        const slopeVal = document.getElementById('slopeAngleVal');
+        const launchVal = document.getElementById('launchAngleVal');
+        const velocityVal = document.getElementById('velocityVal');
+        const axisRotationVal = document.getElementById('axisRotationVal');
+
+        const g = 0.2; 
+        const ORIGIN_X = 80;
+        const BALL_RADIUS = 8;
+        let ORIGIN_Y; 
+
+        let animationId = null;
+        let isMoving = false;
+        let isPaused = false;
+        let isFinished = false;
+        let time = 0;
+        let ball = { x: 0, y: 0, vx: 0, vy: 0, history: [] };
+
+        // ③ウィンドウサイズの変更を監視するための変数
+        let lastWidth = window.innerWidth;
+
+        document.getElementById('copyright').innerHTML = `Copyright &copy; 2021-${new Date().getFullYear()} T.Suzuki`;
+
+        function initCanvas() {
+            const dpr = window.devicePixelRatio || 1;
+            const rect = canvas.parentNode.getBoundingClientRect();
+            canvas.width = rect.width * dpr;
+            canvas.height = 400 * dpr;
+            ctx.scale(dpr, dpr);
+
+            ORIGIN_Y = canvas.height / dpr - 30;
+            
+            // 運動中・終了後はリセットせず、初期状態のみ再計算
+            if (!isMoving && !isFinished) {
+                reset();
+            }
+
+            Object.values(gCanvases).forEach(c => {
+                const r = c.parentNode.getBoundingClientRect();
+                c.width = r.width * dpr;
+                c.height = 150 * dpr;
+                c.getContext('2d').scale(dpr, dpr);
+            });
+            draw();
+        }
+
+        // ③スマホのスクロールによる高さ変動でリセットされないよう横幅のみを監視
+        window.addEventListener('resize', () => {
+            if (window.innerWidth !== lastWidth) {
+                lastWidth = window.innerWidth;
+                initCanvas();
+            }
+        });
+        window.onload = initCanvas;
+
+        function getParams() {
+            return {
+                alpha: (parseFloat(slopeInput.value) * Math.PI) / 180,
+                theta: (parseFloat(launchAngle.value) * Math.PI) / 180,
+                phi: (parseFloat(axisRotationInput.value) * Math.PI) / 180,
+                v0: parseFloat(velocityInput.value)
+            };
+        }
+
+        function getExpectedCollisionTime(p) {
+            const v0 = p.v0 * 0.1;
+            return (2 * v0 * Math.sin(p.theta)) / (g * Math.cos(p.alpha));
+        }
+
+        // 重くならないようMathJaxの更新を制限する
+        let mathjaxTimer = null;
+        function updateUI() {
+            slopeVal.textContent = slopeInput.value + '°';
+            launchVal.textContent = launchInput.value + '°';
+            velocityVal.textContent = (parseFloat(velocityInput.value) / 10).toFixed(1);
+            axisRotationVal.textContent = axisRotationInput.value + '°';
+            
+            // 描画のみを即時実行
+            draw();
+
+            // 数式の再レンダリングは重いため、操作が止まった後に1回だけ行う（デバウンス）
+            if (mathjaxTimer) clearTimeout(mathjaxTimer);
+            mathjaxTimer = setTimeout(() => {
+                if (window.MathJax && MathJax.typesetPromise) {
+                    MathJax.typesetPromise();
+                }
+            }, 300);
+        }
+
+        [slopeInput, launchInput, velocityInput].forEach(input => {
+            input.addEventListener('input', () => {
+                reset();
+                updateUI();
+            });
+        });
+
+        showGuide.addEventListener('change', draw);
+        showComponents.addEventListener('change', draw);
+
+        axisRotationInput.addEventListener('change', () => {
+            const alpha = parseInt(slopeInput.value);
+            const phi = parseInt(axisRotationInput.value);
+            if (Math.abs(phi - alpha) <= 3) {
+                axisRotationInput.value = alpha;
+                updateUI();
+            }
+        });
+
+        axisRotationInput.addEventListener('input', updateUI);
+
+        function updateButtonState() {
+            if (isMoving && !isPaused) {
+                fireBtn.textContent = 'ストップ';
+                fireBtn.disabled = false;
+                fireBtn.className = "bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-4 rounded-xl shadow-sm transition-all text-lg";
+            } else if (isPaused) {
+                fireBtn.textContent = '再開';
+                fireBtn.disabled = false;
+                fireBtn.className = "bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 px-4 rounded-xl shadow-sm transition-all text-lg";
+            } else if (isFinished) {
+                fireBtn.textContent = '運動終了';
+                fireBtn.disabled = true;
+                fireBtn.className = "bg-slate-400 text-white font-bold py-3 px-4 rounded-xl shadow-sm transition-all text-lg";
+            } else {
+                fireBtn.textContent = 'スタート';
+                fireBtn.disabled = false;
+                fireBtn.className = "bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-xl shadow-sm transition-all text-lg";
+            }
+        }
+
+        function reset() {
+            isMoving = false;
+            isPaused = false;
+            isFinished = false;
+            time = 0;
+            const p = getParams();
+            ball.history = [];
+            ball.x = ORIGIN_X;
+            ball.y = ORIGIN_Y - BALL_RADIUS / Math.cos(p.alpha);
+            cancelAnimationFrame(animationId);
+            updateButtonState();
+            draw();
+        }
+
+        resetBtn.onclick = reset;
+
+        resetSettingsBtn.onclick = () => {
+            slopeInput.value = 30;
+            launchInput.value = 45;
+            velocityInput.value = 100;
+            axisRotationInput.value = 0;
+            // ④チェックボックスをONにする
+            showComponents.checked = true;
+            showGuide.checked = true;
+            reset();
+            updateUI();
+        };
+
+        fireBtn.onclick = () => {
+            if (isMoving && !isPaused) {
+                isPaused = true;
+                cancelAnimationFrame(animationId);
+                updateButtonState();
+                return;
+            }
+            if (isPaused) {
+                isPaused = false;
+                updateButtonState();
+                animate();
+                return;
+            }
+            if (isFinished) return;
+
+            isMoving = true;
+            isPaused = false;
+            isFinished = false;
+            updateButtonState();
+            animate();
+        };
+
+        function drawAxes(p) {
+            const len = 120;
+            ctx.save();
+            ctx.translate(ORIGIN_X, ORIGIN_Y);
+            ctx.rotate(-p.phi);
+            drawArrow(ctx, 0, 0, len, 0, '#6366f1', 'x', true, 'main');
+            drawArrow(ctx, 0, 0, 0, -len, '#6366f1', 'y', true, 'main');
+            ctx.restore();
+        }
+
+        function drawSlope(p) {
+            const length = 1000;
+            
+            ctx.beginPath();
+            ctx.moveTo(ORIGIN_X, ORIGIN_Y);
+            ctx.lineTo(ORIGIN_X + length, ORIGIN_Y - length * Math.tan(p.alpha));
+            ctx.lineTo(ORIGIN_X + length, canvas.height / (window.devicePixelRatio || 1));
+            ctx.lineTo(ORIGIN_X, canvas.height / (window.devicePixelRatio || 1));
+            ctx.fillStyle = '#f1f5f9';
+            ctx.fill();
+
+            ctx.beginPath();
+            ctx.moveTo(ORIGIN_X, ORIGIN_Y);
+            ctx.lineTo(ORIGIN_X + length, ORIGIN_Y - length * Math.tan(p.alpha));
+            ctx.moveTo(ORIGIN_X, ORIGIN_Y);
+            ctx.lineTo(ORIGIN_X + length, ORIGIN_Y);
+            
+            ctx.strokeStyle = '#000000';
+            ctx.lineWidth = 1.5;
+            ctx.stroke();
+
+            ctx.beginPath();
+            ctx.setLineDash([5, 5]);
+            ctx.moveTo(ORIGIN_X, ORIGIN_Y);
+            ctx.lineTo(ORIGIN_X + 250, ORIGIN_Y);
+            ctx.strokeStyle = 'rgba(0,0,0,0.3)';
+            ctx.lineWidth = 1;
+            ctx.stroke();
+            ctx.setLineDash([]);
+
+            ctx.save();
+            ctx.translate(ORIGIN_X, ORIGIN_Y);
+            
+            ctx.beginPath();
+            ctx.arc(0, 0, 45, 0, -p.alpha, true);
+            ctx.strokeStyle = '#64748b';
+            ctx.lineWidth = 1.5;
+            ctx.stroke();
+            ctx.fillStyle = '#64748b';
+            ctx.font = 'italic bold 22px serif';
+            ctx.fillText('α', 55 * Math.cos(-p.alpha/2), 55 * Math.sin(-p.alpha/2));
+
+            const v0_val = p.v0;
+            const arcRadius = Math.min(75, Math.max(30, v0_val * 0.6));
+            ctx.beginPath();
+            ctx.arc(0, 0, arcRadius, -p.alpha, -(p.alpha + p.theta), true);
+            ctx.strokeStyle = '#ef4444';
+            ctx.stroke();
+            ctx.fillStyle = '#ef4444';
+            ctx.font = 'italic bold 22px serif';
+            ctx.fillText('θ', (arcRadius + 15) * Math.cos(-(p.alpha + p.theta/2)), (arcRadius + 15) * Math.sin(-(p.alpha + p.theta/2)));
+
+            ctx.restore();
+        }
+
+        function getPositionAtTime(t, p) {
+            const v0 = p.v0 * 0.1;
+            const angle = p.alpha + p.theta;
+            const startX = ORIGIN_X;
+            const startY = ORIGIN_Y - BALL_RADIUS / Math.cos(p.alpha);
+            
+            const x = startX + v0 * Math.cos(angle) * t;
+            const y = startY - (v0 * Math.sin(angle) * t - 0.5 * g * t * t);
+            
+            const vx = v0 * Math.cos(angle);
+            const vy = -(v0 * Math.sin(angle) - g * t);
+            
+            return { x, y, vx, vy };
+        }
+
+        function drawGuide(p) {
+            if (!showGuide.checked) return;
+            ctx.beginPath();
+            ctx.setLineDash([4, 4]);
+            ctx.strokeStyle = 'rgba(100, 116, 139, 0.4)';
+            
+            let first = true;
+            for (let t = 0; t < 2000; t++) {
+                const pos = getPositionAtTime(t, p);
+                const slopeYAtX = ORIGIN_Y - (pos.x - ORIGIN_X) * Math.tan(p.alpha);
+                if (pos.y + BALL_RADIUS * Math.cos(p.alpha) >= slopeYAtX && t > 5) break;
+
+                if (first) { ctx.moveTo(pos.x, pos.y); first = false; }
+                else ctx.lineTo(pos.x, pos.y);
+                
+                if (pos.x > canvas.width || pos.y > canvas.height) break;
+            }
+            ctx.stroke();
+            ctx.setLineDash([]);
+        }
+
+        function getRotatedData(worldX, worldY, worldVx, worldVy, p) {
+            const rx = worldX - ORIGIN_X;
+            // 質点としてのy座標（ボールの底面補正を打ち消す）
+            const ry = (ORIGIN_Y - worldY) - (BALL_RADIUS / Math.cos(p.alpha)); 
+            const rvx = worldVx;
+            const rvy = -worldVy;
+            const x = rx * Math.cos(p.phi) + ry * Math.sin(p.phi);
+            const y = -rx * Math.sin(p.phi) + ry * Math.cos(p.phi);
+            const vx = rvx * Math.cos(p.phi) + rvy * Math.sin(p.phi);
+            const vy = -rvx * Math.sin(p.phi) + rvy * Math.cos(p.phi);
+            return { x, y, vx, vy };
+        }
+
+        function drawArrow(gctx, x1, y1, x2, y2, color, label, isMain = false, type = 'graph') {
+            const headlen = isMain ? 15 : 10;
+            const angle = Math.atan2(y2 - y1, x2 - x1);
+            gctx.beginPath(); gctx.moveTo(x1, y1); gctx.lineTo(x2, y2);
+            gctx.strokeStyle = color; gctx.lineWidth = isMain ? 3 : 2; gctx.stroke();
+            gctx.beginPath(); gctx.moveTo(x2, y2);
+            gctx.lineTo(x2 - headlen * Math.cos(angle - Math.PI / 6), y2 - headlen * Math.sin(angle - Math.PI / 6));
+            gctx.lineTo(x2 - headlen * Math.cos(angle + Math.PI / 6), y2 - headlen * Math.sin(angle + Math.PI / 6));
+            gctx.closePath(); gctx.fillStyle = color; gctx.fill();
+            
+            if (label) {
+                gctx.fillStyle = color;
+                gctx.font = isMain ? 'italic bold 24px serif' : 'italic bold 16px serif';
+                gctx.textAlign = 'center';
+                gctx.textBaseline = 'middle';
+                
+                let lx, ly;
+                if (type === 'graph') {
+                    if (label === 't') { lx = x2; ly = y2 + 15; }
+                    else { lx = x2 - 15; ly = y2; }
+                } else {
+                    const offset = isMain ? 25 : 15;
+                    lx = x2 + offset * Math.cos(angle);
+                    ly = y2 + offset * Math.sin(angle);
+                }
+                gctx.fillText(label, lx, ly);
+            }
+        }
+
+        function drawIndividualGraph(c, mode, key, p) {
+            const gctx = c.getContext('2d');
+            const cw = c.width / (window.devicePixelRatio || 1);
+            const ch = c.height / (window.devicePixelRatio || 1);
+            gctx.clearRect(0, 0, cw, ch);
+            
+            const padL = 50; 
+            const padR = 30; 
+            const padT = 30; 
+            const padB = 40; 
+
+            const expectedT = getExpectedCollisionTime(p);
+            const maxT = Math.max(100, expectedT * 1.1);
+            const timeScale = (cw - padL - padR) / maxT;
+            const centerY = (mode === 'vel') ? (ch - padT - padB) / 2 + padT : ch - padB;
+
+            drawArrow(gctx, padL, ch - padB + 5, padL, padT - 15, '#64748b', key, false, 'graph'); 
+            drawArrow(gctx, padL - 5, centerY, cw - padR + 15, centerY, '#64748b', 't', false, 'graph'); 
+
+            if (ball.history.length < 2) return;
+
+            gctx.save();
+            gctx.beginPath();
+            gctx.rect(padL, 0, cw - padL - padR + 5, ch);
+            gctx.clip();
+
+            gctx.beginPath();
+            gctx.strokeStyle = (key.includes('x')) ? '#3b82f6' : '#ef4444';
+            gctx.lineWidth = 2.5;
+            
+            ball.history.forEach((h, i) => {
+                const data = getRotatedData(h.x, h.y, h.vx, h.vy, p);
+                const val = data[key];
+                const px = padL + i * timeScale;
+                let py;
+                if (mode === 'pos') py = (ch - padB) - val * 0.3; 
+                else py = centerY - val * 6;
+                
+                if (i === 0) gctx.moveTo(px, py);
+                else gctx.lineTo(px, py);
+            });
+            gctx.stroke();
+            gctx.restore();
+        }
+
+        function drawBall() {
+            if (ball.history.length > 1) {
+                ctx.beginPath();
+                ctx.moveTo(ball.history[0].x, ball.history[0].y);
+                for (let i = 1; i < ball.history.length; i++) {
+                    ctx.lineTo(ball.history[i].x, ball.history[i].y);
+                }
+                ctx.strokeStyle = '#3b82f6';
+                ctx.lineWidth = 3;
+                ctx.stroke();
+            }
+            ctx.beginPath();
+            ctx.arc(ball.x, ball.y, BALL_RADIUS, 0, Math.PI * 2);
+            ctx.fillStyle = '#f59e0b';
+            ctx.fill();
+            ctx.strokeStyle = '#d97706';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+        }
+
+        function draw() {
+            if (isNaN(ORIGIN_Y)) return; 
+            const p = getParams();
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            drawSlope(p);
+            drawAxes(p);
+            drawGuide(p);
+            
+            let shouldShowVector = true;
+            if (!showComponents.checked) {
+                if (isMoving && !isPaused) {
+                    shouldShowVector = false;
+                }
+            }
+
+            if (shouldShowVector) {
+                if (!isMoving && ball.history.length === 0) {
+                    const angle = p.alpha + p.theta;
+                    const vLen = p.v0;
+                    drawArrow(ctx, ball.x, ball.y, ball.x + vLen*Math.cos(angle), ball.y - vLen*Math.sin(angle), '#ef4444', 'v₀', true, 'main');
+                } else {
+                    const vScale = 12;
+                    drawArrow(ctx, ball.x, ball.y, ball.x + ball.vx * vScale, ball.y + ball.vy * vScale, '#ef4444', 'v', true, 'main');
+                }
+            }
+            
+            drawBall();
+            drawIndividualGraph(gCanvases.posX, 'pos', 'x', p);
+            drawIndividualGraph(gCanvases.posY, 'pos', 'y', p);
+            drawIndividualGraph(gCanvases.velX, 'vel', 'vx', p);
+            drawIndividualGraph(gCanvases.velY, 'vel', 'vy', p);
+        }
+
+        function animate() {
+            if (!isMoving || isPaused) return;
+            const p = getParams();
+            
+            const pos = getPositionAtTime(time, p);
+            ball.x = pos.x;
+            ball.y = pos.y;
+            ball.vx = pos.vx;
+            ball.vy = pos.vy;
+            
+            ball.history.push({ x: ball.x, y: ball.y, vx: ball.vx, vy: ball.vy });
+            
+            const slopeYAtX = ORIGIN_Y - (ball.x - ORIGIN_X) * Math.tan(p.alpha);
+            if (ball.y + BALL_RADIUS * Math.cos(p.alpha) >= slopeYAtX && time > 5) {
+                isMoving = false;
+                isFinished = true;
+                ball.y = slopeYAtX - BALL_RADIUS * Math.cos(p.alpha);
+                updateButtonState();
+                draw();
+                return;
+            }
+            
+            time++;
+            draw();
+            animationId = requestAnimationFrame(animate);
+        }
+    </script>
+</body>
+</html>

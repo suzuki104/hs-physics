@@ -1,0 +1,477 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>人工衛星の軌道と万有引力</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- MathJax for scientific notation -->
+    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <style>
+        body {
+            background-color: #020617;
+            color: #f8fafc;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            margin: 0;
+            font-family: 'sans-serif';
+        }
+        header {
+            background: #0f172a;
+            padding: 0.75rem 1.5rem;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            text-align: center;
+            z-index: 20;
+        }
+        #canvas-container {
+            flex: 1;
+            position: relative;
+            background: radial-gradient(circle at center, #1e293b 0%, #020617 100%);
+            overflow: hidden;
+        }
+        canvas {
+            display: block;
+            touch-action: pan-y;
+        }
+        .controls-panel {
+            background: #0f172a;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+            padding: 1rem 1.5rem;
+            z-index: 10;
+        }
+        input[type="range"] {
+            accent-color: #3b82f6;
+        }
+    </style>
+</head>
+<body>
+
+<header>
+    <h1 class="text-xl font-bold text-blue-400 drop-shadow-md tracking-tight">人工衛星の軌道と万有引力</h1>
+</header>
+
+<div id="canvas-container">
+    <canvas id="simCanvas"></canvas>
+    
+    <div class="absolute top-4 right-4 bg-black/40 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/10">
+        <span id="val-status" class="text-xs font-bold text-yellow-400 tracking-wider">待機中</span>
+    </div>
+</div>
+
+<div class="controls-panel">
+    <div class="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-12 gap-6 items-center">
+        
+        <!-- Status Display -->
+        <div class="md:col-span-3 bg-slate-900/50 p-3 rounded-lg border border-white/5 space-y-1">
+            <div class="flex justify-between items-center text-xs">
+                <span class="text-slate-400">速度 \( v \)</span>
+                <span class="font-mono text-blue-300"><span id="val-v" class="text-sm font-bold">0.00</span> km/s</span>
+            </div>
+            <div class="flex justify-between items-center text-xs">
+                <span class="text-slate-400">高度 \( h \)</span>
+                <span class="font-mono text-blue-300"><span id="val-h" class="text-sm font-bold">0</span> km</span>
+            </div>
+        </div>
+
+        <!-- Sliders and Speed Info -->
+        <div class="md:col-span-6 space-y-3">
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-[10px] tracking-wider font-bold text-slate-400 mb-1">初速度 \( v_0 \): <span id="v0-display" class="text-blue-400">7.8</span> km/s</label>
+                    <input type="range" id="v0-slider" min="1" max="15" step="0.1" value="7.8" class="w-full h-1.5 bg-slate-700 rounded-lg appearance-none cursor-pointer">
+                </div>
+                <div>
+                    <label class="block text-[10px] uppercase tracking-wider font-bold text-slate-400 mb-1">表示倍率: <span id="zoom-display" class="text-indigo-400">100</span>%</label>
+                    <input type="range" id="zoom-slider" min="1" max="100" step="1" value="100" class="w-full h-1.5 bg-slate-700 rounded-lg appearance-none cursor-pointer">
+                </div>
+            </div>
+            <div class="flex flex-col items-center gap-1 text-[10px] text-slate-400 border-t border-white/5 pt-1">
+                <div class="flex justify-center gap-6">
+                    <span>第一宇宙速度: <b class="text-blue-300">7.91 km/s</b></span>
+                    <span>第二宇宙速度: <b class="text-indigo-300">11.19 km/s</b></span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Buttons and Navigation -->
+        <div class="md:col-span-3 space-y-3">
+            <div class="flex gap-2">
+                <button id="launch-btn" class="flex-1 py-2 bg-blue-600 hover:bg-blue-500 rounded-lg font-bold transition-all shadow-lg shadow-blue-900/20 active:scale-95 text-xs text-white">発射</button>
+                <button id="reset-btn" class="flex-1 py-2 bg-slate-700 hover:bg-slate-600 rounded-lg font-bold transition-all active:scale-95 text-xs text-slate-300">リセット</button>
+            </div>
+            <div class="flex flex-col items-center gap-2">
+                <div class="flex gap-2 w-full">
+                    <!--//20260810<a href="../6.0_home/home.html" class="flex-1 text-center px-2 py-2 bg-slate-800 hover:bg-slate-700 border border-slate-600 rounded-md text-xs font-bold text-slate-200 transition-all shadow-md active:scale-95">ホーム</a>
+                    <a href="../6.1_physics_home/physics_home.html" class="flex-1 text-center px-2 py-2 bg-slate-800 hover:bg-slate-700 border border-slate-600 rounded-md text-xs font-bold text-slate-200 transition-all shadow-md active:scale-95">物理一覧</a>
+                //20260810--></div>
+                <p id="copyright" class="text-[10px] text-slate-500 font-bold tracking-tight"></p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    const canvas = document.getElementById('simCanvas');
+    const container = document.getElementById('canvas-container');
+    const ctx = canvas.getContext('2d');
+    const v0Slider = document.getElementById('v0-slider');
+    const v0Display = document.getElementById('v0-display');
+    const zoomSlider = document.getElementById('zoom-slider');
+    const zoomDisplay = document.getElementById('zoom-display');
+    const launchBtn = document.getElementById('launch-btn');
+    const resetBtn = document.getElementById('reset-btn');
+    
+    const valV = document.getElementById('val-v');
+    const valH = document.getElementById('val-h');
+    const valStatus = document.getElementById('val-status');
+
+    document.getElementById('copyright').innerHTML = `&copy; ${new Date().getFullYear()} T.suzuki`;
+
+    // Constants
+    const G = 6.67430e-11;
+    const M = 5.972e24; 
+    const R_EARTH = 6371000; 
+    const LAUNCH_ALTITUDE = 1; 
+    
+    let baseScale = 0; 
+    let currentScale = 0;
+    let centerX, centerY;
+
+    let satellite = {
+        active: false,
+        x: 0,
+        y: 0,
+        vx: 0,
+        vy: 0,
+        trail: [],
+        predictedOrbit: []
+    };
+
+    function getAcceleration(x, y) {
+        const r2 = x*x + y*y;
+        const r = Math.sqrt(r2);
+        if (r < 100) return { ax: 0, ay: 0 };
+        const accel = (G * M) / (r2 * r); 
+        return {
+            ax: -accel * x,
+            ay: -accel * y
+        };
+    }
+
+    function init() {
+        window.addEventListener('resize', resize);
+        resize();
+        resetSim();
+        animate();
+    }
+
+    function resize() {
+        canvas.width = container.clientWidth;
+        canvas.height = container.clientHeight;
+        centerX = canvas.width / 2;
+        centerY = canvas.height / 2;
+        baseScale = Math.min(canvas.width, canvas.height) / (R_EARTH * 2.5);
+        updateScale();
+    }
+
+    function updateScale() {
+        const zoomPercent = parseInt(zoomSlider.value);
+        currentScale = baseScale * (zoomPercent / 100);
+        zoomDisplay.textContent = zoomPercent;
+    }
+
+    function calculateOrbitPath() {
+        const orbitPoints = [];
+        const x0 = satellite.x;
+        const y0 = satellite.y;
+        const vx0 = satellite.vx;
+        const vy0 = satellite.vy;
+
+        const h = x0 * vy0 - y0 * vx0;
+        const r0 = Math.sqrt(x0 * x0 + y0 * y0);
+        const v2 = vx0 * vx0 + vy0 * vy0;
+        const mu = G * M;
+        const energy = v2 / 2 - mu / r0;
+
+        const ex = (v2 / mu - 1 / r0) * x0 - (x0 * vx0 + y0 * vy0) / mu * vx0;
+        const ey = (v2 / mu - 1 / r0) * y0 - (x0 * vx0 + y0 * vy0) / mu * vy0;
+        const eccentricity = Math.sqrt(ex * ex + ey * ey);
+
+        if (eccentricity < 1) {
+            const segments = 120;
+            const semiMajor = -mu / (2 * energy);
+            const angleOrbit = Math.atan2(ey, ex);
+
+            for (let i = 0; i <= segments; i++) {
+                const theta = (i / segments) * Math.PI * 2;
+                const r = (semiMajor * (1 - eccentricity * eccentricity)) / (1 + eccentricity * Math.cos(theta));
+                const finalAngle = theta + angleOrbit;
+                orbitPoints.push({
+                    x: r * Math.cos(finalAngle),
+                    y: r * Math.sin(finalAngle)
+                });
+            }
+        } else {
+            const segments = 100;
+            const angleOrbit = Math.atan2(ey, ex);
+            const limit = eccentricity > 1 ? Math.acos(-1 / eccentricity) * 0.95 : Math.PI * 0.9;
+            
+            for (let i = -segments; i <= segments; i++) {
+                const theta = (i / segments) * limit;
+                const r = (h * h / mu) / (1 + eccentricity * Math.cos(theta));
+                if (r > R_EARTH * 1000) continue; // 大幅に離れる場合は制限
+                
+                const finalAngle = theta + angleOrbit;
+                orbitPoints.push({
+                    x: r * Math.cos(finalAngle),
+                    y: r * Math.sin(finalAngle)
+                });
+            }
+        }
+        satellite.predictedOrbit = orbitPoints;
+    }
+
+    function resetSim() {
+        satellite.active = false;
+        satellite.x = 0;
+        satellite.y = -(R_EARTH + LAUNCH_ALTITUDE); 
+        satellite.vx = parseFloat(v0Slider.value) * 1000; 
+        satellite.vy = 0;
+        satellite.trail = [];
+        calculateOrbitPath();
+        valStatus.textContent = "待機中";
+        valStatus.className = "text-xs font-bold text-yellow-400 tracking-wider";
+        updateUI(R_EARTH + LAUNCH_ALTITUDE);
+    }
+
+    function updateUI(r) {
+        const speed = Math.sqrt(satellite.vx**2 + satellite.vy**2);
+        valV.textContent = isFinite(speed) ? (speed / 1000).toFixed(2) : "0.00";
+        valH.textContent = isFinite(r) ? Math.max(0, Math.floor((r - R_EARTH) / 1000)).toLocaleString() : "0";
+    }
+
+    launchBtn.addEventListener('click', () => {
+        if (!satellite.active) {
+            satellite.active = true;
+            valStatus.textContent = "飛行中";
+            valStatus.className = "text-xs font-bold text-green-400 tracking-wider";
+        }
+    });
+
+    resetBtn.addEventListener('click', () => {
+        resetSim();
+    });
+
+    v0Slider.addEventListener('input', (e) => {
+        v0Display.textContent = e.target.value;
+        resetSim();
+    });
+
+    zoomSlider.addEventListener('input', updateScale);
+
+    function updatePhysics() {
+        if (!satellite.active) return;
+
+        const dt = 0.1; 
+        const subSteps = 400; 
+
+        for(let i=0; i<subSteps; i++) {
+            const r = Math.sqrt(satellite.x*satellite.x + satellite.y*satellite.y);
+            
+            if (r <= R_EARTH) {
+                satellite.active = false;
+                valStatus.textContent = "墜落";
+                valStatus.className = "text-xs font-bold text-red-500 tracking-wider";
+                const angle = Math.atan2(satellite.y, satellite.x);
+                satellite.x = R_EARTH * Math.cos(angle);
+                satellite.y = R_EARTH * Math.sin(angle);
+                satellite.vx = 0;
+                satellite.vy = 0;
+                break;
+            }
+
+            const k1v = getAcceleration(satellite.x, satellite.y);
+            const k1x = { vx: satellite.vx, vy: satellite.vy };
+
+            const k2v = getAcceleration(satellite.x + k1x.vx * dt/2, satellite.y + k1x.vy * dt/2);
+            const k2x = { vx: satellite.vx + k1v.ax * dt/2, vy: satellite.vy + k1v.ay * dt/2 };
+
+            const k3v = getAcceleration(satellite.x + k2x.vx * dt/2, satellite.y + k2x.vy * dt/2);
+            const k3x = { vx: satellite.vx + k2v.ax * dt/2, vy: satellite.vy + k2v.ay * dt/2 };
+
+            const k4v = getAcceleration(satellite.x + k3x.vx * dt, satellite.y + k3x.vy * dt);
+            const k4x = { vx: satellite.vx + k3v.ax * dt, vy: satellite.vy + k3v.ay * dt };
+
+            satellite.vx += (k1v.ax + 2*k2v.ax + 2*k3v.ax + k4v.ax) * dt / 6;
+            satellite.vy += (k1v.ay + 2*k2v.ay + 2*k3v.ay + k4v.ay) * dt / 6;
+            satellite.x += (k1x.vx + 2*k2x.vx + 2*k3x.vx + k4x.vx) * dt / 6;
+            satellite.y += (k1x.vy + 2*k2x.vy + 2*k3x.vy + k4x.vy) * dt / 6;
+
+            if (!isFinite(satellite.x) || !isFinite(satellite.y)) {
+                satellite.active = false;
+                break;
+            }
+        }
+
+        const currentR = Math.sqrt(satellite.x**2 + satellite.y**2);
+        
+        if (satellite.active) {
+            satellite.trail.push({x: satellite.x, y: satellite.y});
+            if (satellite.trail.length > 5000) satellite.trail.shift();
+        }
+
+        const speed = Math.sqrt(satellite.vx**2 + satellite.vy**2);
+        const escapeSpeed = Math.sqrt(2 * G * M / currentR);
+        
+        // ステータス表示の更新（運動は止めない）
+        if (speed >= escapeSpeed) {
+            valStatus.textContent = "地球脱出";
+            valStatus.className = "text-xs font-bold text-blue-400 tracking-wider";
+        } else if (satellite.active) {
+            valStatus.textContent = "飛行中";
+            valStatus.className = "text-xs font-bold text-green-400 tracking-wider";
+        }
+
+        // 描画領域を極端に外れた場合のみ処理を制限（演算負荷軽減のため）
+        if (currentR > R_EARTH * 1000) {
+            satellite.active = false;
+        }
+
+        updateUI(currentR);
+    }
+
+    function draw() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        if (!isFinite(centerX) || !isFinite(centerY) || !isFinite(currentScale)) return;
+
+        // Stars
+        ctx.fillStyle = "rgba(255, 255, 255, 0.4)";
+        for(let i=0; i<100; i++) {
+            const x = (Math.sin(i*12.4) * 0.5 + 0.5) * canvas.width;
+            const y = (Math.cos(i*56.8) * 0.5 + 0.5) * canvas.height;
+            ctx.beginPath();
+            ctx.arc(x, y, 0.7, 0, Math.PI*2);
+            ctx.fill();
+        }
+
+        // Earth
+        ctx.save();
+        const earthRadiusPx = R_EARTH * currentScale;
+        if (isFinite(earthRadiusPx) && earthRadiusPx > 0) {
+            ctx.beginPath();
+            const gradient = ctx.createRadialGradient(centerX, centerY, Math.max(0.1, earthRadiusPx * 0.1), centerX, centerY, earthRadiusPx);
+            gradient.addColorStop(0, '#60a5fa');
+            gradient.addColorStop(0.7, '#2563eb');
+            gradient.addColorStop(1, '#1e3a8a');
+            ctx.fillStyle = gradient;
+            ctx.arc(centerX, centerY, earthRadiusPx, 0, Math.PI * 2);
+            ctx.fill();
+            
+            ctx.beginPath();
+            ctx.arc(centerX, centerY, earthRadiusPx + 2, 0, Math.PI * 2);
+            ctx.strokeStyle = "rgba(147, 197, 253, 0.3)";
+            ctx.lineWidth = Math.max(1, 4 * (currentScale / baseScale));
+            ctx.stroke();
+        }
+        ctx.restore();
+
+        // 1. Predicted Orbit
+        if (satellite.predictedOrbit.length > 1) {
+            ctx.save();
+            ctx.beginPath();
+            ctx.strokeStyle = "rgba(59, 130, 246, 0.4)";
+            ctx.lineWidth = 1;
+            let started = false;
+            for (let pt of satellite.predictedOrbit) {
+                const px = centerX + pt.x * currentScale;
+                const py = centerY + pt.y * currentScale;
+                if (isFinite(px) && isFinite(py)) {
+                    if (!started) {
+                        ctx.moveTo(px, py);
+                        started = true;
+                    } else {
+                        ctx.lineTo(px, py);
+                    }
+                }
+            }
+            ctx.stroke();
+            ctx.restore();
+        }
+
+        // 2. Real Trail
+        if (satellite.trail.length > 1 && isFinite(currentScale)) {
+            ctx.save();
+            ctx.beginPath();
+            ctx.strokeStyle = "rgba(255, 255, 255, 0.6)"; 
+            ctx.lineWidth = 2.5; 
+            ctx.setLineDash([8, 8]); 
+            ctx.lineJoin = 'round';
+            ctx.lineCap = 'round';
+            
+            let started = false;
+            for (let i = 0; i < satellite.trail.length; i += 2) {
+                const tx = centerX + satellite.trail[i].x * currentScale;
+                const ty = centerY + satellite.trail[i].y * currentScale;
+                if (isFinite(tx) && isFinite(ty)) {
+                    if (!started) {
+                        ctx.moveTo(tx, ty);
+                        started = true;
+                    } else {
+                        ctx.lineTo(tx, ty);
+                    }
+                }
+            }
+            ctx.stroke();
+            ctx.restore();
+        }
+
+        // Satellite
+        const satX = centerX + satellite.x * currentScale;
+        const satY = centerY + satellite.y * currentScale;
+        
+        if (isFinite(satX) && isFinite(satY)) {
+            const glowSize = Math.max(1, 10 * Math.sqrt(Math.abs(currentScale / baseScale)));
+            if (isFinite(glowSize) && glowSize > 0) {
+                const satGlow = ctx.createRadialGradient(satX, satY, 0.1, satX, satY, glowSize);
+                satGlow.addColorStop(0, 'rgba(255, 255, 255, 1)');
+                satGlow.addColorStop(1, 'rgba(255, 255, 255, 0)');
+                ctx.fillStyle = satGlow;
+                ctx.beginPath();
+                ctx.arc(satX, satY, glowSize, 0, Math.PI*2);
+                ctx.fill();
+            }
+
+            ctx.fillStyle = "#ffffff";
+            ctx.beginPath();
+            ctx.arc(satX, satY, 2.5, 0, Math.PI * 2);
+            ctx.fill();
+            
+            if (satellite.active) {
+                const vxDisp = satellite.vx * 0.003;
+                const vyDisp = satellite.vy * 0.003;
+                if (isFinite(vxDisp) && isFinite(vyDisp)) {
+                    ctx.beginPath();
+                    ctx.strokeStyle = "rgba(251, 191, 36, 0.8)";
+                    ctx.lineWidth = 2;
+                    ctx.moveTo(satX, satY);
+                    ctx.lineTo(satX + vxDisp, satY + vyDisp);
+                    ctx.stroke();
+                }
+            }
+        }
+    }
+
+    function animate() {
+        updatePhysics();
+        draw();
+        requestAnimationFrame(animate);
+    }
+
+    init();
+</script>
+
+</body>
+</html>

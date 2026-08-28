@@ -1,0 +1,1007 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>作用・反作用の法則|高校物理アニメーション教材</title>
+    <!-- Tailwind CSS for high quality modern UI -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- KaTeX for beautiful math equations -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/contrib/auto-render.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;900&display=swap');
+        body {
+            font-family: 'Noto Sans JP', sans-serif;
+            background-color: #f0f4f8;
+        }
+        /* スライダースタイルカスタマイズ（丸と棒を太く、触りやすく） */
+        input[type="range"] {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 100%;
+            height: 12px; /* 棒を太く */
+            background: #cbd5e1;
+            border-radius: 9999px;
+            outline: none;
+            margin: 14px 0; /* 上下の余白を確保して文字と重なるのを防止 */
+            transition: background 0.2s ease;
+        }
+        /* スライダーのつまみ（丸）を大きく */
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            cursor: pointer;
+            border: 3px solid #ffffff;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+            transition: transform 0.1s ease;
+        }
+        input[type="range"]::-webkit-slider-thumb:hover {
+            transform: scale(1.15);
+        }
+        input[type="range"]::-moz-range-thumb {
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            cursor: pointer;
+            border: 3px solid #ffffff;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+            transition: transform 0.1s ease;
+        }
+        input[type="range"]::-moz-range-thumb:hover {
+            transform: scale(1.15);
+        }
+
+        /* 各役割ごとの色分け */
+        .slider-blue::-webkit-slider-thumb { background: #3b82f6 !important; }
+        .slider-blue::-moz-range-thumb { background: #3b82f6 !important; }
+        
+        .slider-indigo::-webkit-slider-thumb { background: #4f46e5 !important; }
+        .slider-indigo::-moz-range-thumb { background: #4f46e5 !important; }
+        
+        .slider-emerald::-webkit-slider-thumb { background: #10b981 !important; }
+        .slider-emerald::-moz-range-thumb { background: #10b981 !important; }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col justify-between text-slate-800">
+
+    <!-- ヘッダー (中央揃えのシンプルなタイトル) -->
+    <header class="bg-gradient-to-r from-blue-600 to-indigo-700 text-white py-5 px-6 shadow-md">
+        <div class="max-w-6xl mx-auto text-center">
+            <h1 class="text-2xl font-bold tracking-wider">作用・反作用の法則</h1>
+        </div>
+    </header>
+
+    <!-- メインコンテンツ -->
+    <main class="max-w-6xl w-full mx-auto p-4 flex-grow flex flex-col gap-5">
+        
+        <!-- スライダー設定エリア（アニメーションの上、スマホ縦画面でも1列（1行）で表示） -->
+        <div class="bg-white p-3 sm:p-5 rounded-2xl shadow-lg border border-slate-200">
+            <div class="grid grid-cols-3 gap-2 sm:gap-6">
+                <!-- スライダー：押す力 (60N 〜 150N, デフォルト100N) -->
+                <div class="flex flex-col gap-1">
+                    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center">
+                        <span class="text-[10px] sm:text-sm font-bold text-slate-700 flex items-center gap-1">
+                            <span class="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-red-500"></span>
+                            力
+                        </span>
+                        <span class="text-[10px] sm:text-xs bg-red-50 text-red-600 px-1.5 sm:px-2 py-0.5 rounded font-mono font-bold mt-0.5 sm:mt-0" id="lblForce">100 N</span>
+                    </div>
+                    <input type="range" id="inputForce" min="60" max="150" step="5" value="100" class="slider-blue appearance-none cursor-pointer">
+                    <div class="flex justify-between text-[8px] sm:text-[10px] text-slate-400">
+                        <span>60 N</span>
+                        <span>150 N</span>
+                    </div>
+                </div>
+
+                <!-- スライダー：大人の質量（左） -->
+                <div class="flex flex-col gap-1">
+                    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center">
+                        <span class="text-[10px] sm:text-sm font-bold text-slate-700 flex items-center gap-1">
+                            <span class="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-indigo-500"></span>
+                            質量 $m_1$（左）
+                        </span>
+                        <span class="text-[10px] sm:text-xs bg-indigo-50 text-indigo-600 px-1.5 sm:px-2 py-0.5 rounded font-mono font-bold mt-0.5 sm:mt-0" id="lblMass1">80 kg</span>
+                    </div>
+                    <input type="range" id="inputMass1" min="30" max="120" step="5" value="80" class="slider-indigo appearance-none cursor-pointer">
+                    <div class="flex justify-between text-[8px] sm:text-[10px] text-slate-400">
+                        <span>30 kg</span>
+                        <span>120 kg</span>
+                    </div>
+                </div>
+
+                <!-- スライダー：大人の質量（右） (デフォルト40kg) -->
+                <div class="flex flex-col gap-1">
+                    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center">
+                        <span class="text-[10px] sm:text-sm font-bold text-slate-700 flex items-center gap-1">
+                            <span class="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-emerald-500"></span>
+                            質量 $m_2$（右）
+                        </span>
+                        <span class="text-[10px] sm:text-xs bg-emerald-50 text-emerald-600 px-1.5 sm:px-2 py-0.5 rounded font-mono font-bold mt-0.5 sm:mt-0" id="lblMass2">40 kg</span>
+                    </div>
+                    <input type="range" id="inputMass2" min="30" max="120" step="5" value="40" class="slider-emerald appearance-none cursor-pointer">
+                    <div class="flex justify-between text-[8px] sm:text-[10px] text-slate-400">
+                        <span>30 kg</span>
+                        <span>120 kg</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- コントロールボタンエリア（スライダーとアニメーションの間に配置、ドロップダウンを追加） -->
+        <div class="flex flex-col sm:flex-row justify-center items-center gap-4 bg-white p-4 rounded-2xl shadow-md border border-slate-200">
+            <div class="flex items-center gap-4">
+                <!-- w-32 sm:w-36 を設定し、スタート、一時停止、再開、終了でサイズがブレないように固定 -->
+                <button id="btnPlay" class="flex items-center justify-center gap-1.5 w-32 sm:w-36 py-3 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-semibold rounded-xl shadow-md transition-all">
+                    <i data-lucide="play" class="w-4 h-4 fill-current"></i>
+                    <span>スタート</span>
+                </button>
+                <button id="btnReset" class="flex items-center justify-center gap-1.5 w-32 sm:w-36 py-3 bg-slate-200 hover:bg-slate-300 active:bg-slate-400 text-slate-700 font-semibold rounded-xl transition-all">
+                    <i data-lucide="rotate-ccw" class="w-4 h-4"></i>
+                    <span>リセット</span>
+                </button>
+            </div>
+            
+            <div class="h-6 w-[1px] bg-slate-200 hidden sm:block"></div>
+
+            <!-- 強調表示用ドロップダウンリスト -->
+            <div class="flex items-center gap-2">
+                <label for="selectDisplayMode" class="text-sm font-bold text-slate-600">表示モード:</label>
+                <select id="selectDisplayMode" class="bg-slate-50 border border-slate-300 text-slate-700 text-sm font-bold rounded-xl focus:ring-blue-500 focus:border-blue-500 p-2.5 outline-none cursor-pointer">
+                    <option value="normal" selected>通常表示</option>
+                    <option value="highlightLeft">左の大人のみ強調して表示</option>
+                    <option value="highlightRight">右の大人のみ強調して表示</option>
+                </select>
+            </div>
+        </div>
+
+        <!-- アニメーション表示エリア -->
+        <div class="flex flex-col gap-4">
+            
+            <!-- キャンバスコンテナ（PCでの縦幅をさらにコンパクトにし、スクロールなしで一画面に完全に収まるよう sm:aspect-[2.8/1] に変更） -->
+            <div class="bg-white rounded-2xl shadow-lg border border-slate-200 overflow-hidden flex flex-col">
+                <!-- ステータスバー (シミュレーション画面を「スケートボード」に変更、待機中を「運動前」に変更) -->
+                <div class="bg-slate-50 border-b border-slate-100 px-4 py-2 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-1 sm:gap-0 text-xs text-slate-500 font-medium">
+                    <span class="flex items-center gap-1">
+                        <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                        スケートボード
+                    </span>
+                    <span id="simulation-state" class="whitespace-nowrap">運動前</span>
+                </div>
+
+                <!-- 描画キャンバス (コンテナのアスペクト比を動的に設定) -->
+                <div class="relative w-full aspect-[4/3] sm:aspect-[2.8/1] bg-gradient-to-b from-sky-100 to-white overflow-hidden">
+                    <!-- touch-action: pan-y で、Canvas上を触っても縦スクロールできるように設定 -->
+                    <canvas id="simCanvas" class="w-full h-full block" style="touch-action: pan-y;"></canvas>
+                </div>
+            </div>
+
+            <!-- グラフ/データ表示エリア (ご指示の通り、統合された美しい表形式に変更。順番: 加速度、速度、質量、受ける力) -->
+            <div class="bg-white p-4 rounded-xl shadow-md border border-slate-200 overflow-x-auto">
+                <table class="w-full text-left border-collapse min-w-[500px]">
+                    <thead>
+                        <tr class="bg-slate-50 border-b border-slate-200 text-xs text-slate-500 font-bold uppercase tracking-wider">
+                            <th class="p-3 w-1/3">物理量</th>
+                            <th class="p-3 w-1/3 text-indigo-700">
+                                <div class="flex items-center gap-1.5">
+                                    <span class="w-2.5 h-2.5 rounded-full bg-indigo-500"></span>
+                                    大人（左）
+                                </div>
+                            </th>
+                            <th class="p-3 w-1/3 text-emerald-700">
+                                <div class="flex items-center gap-1.5">
+                                    <span class="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
+                                    大人（右）
+                                </div>
+                            </th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-100 text-sm">
+                        <!-- 行1: 加速度 -->
+                        <tr class="hover:bg-slate-50/50 transition-colors">
+                            <td class="p-3 font-medium text-slate-500">加速度 $a$</td>
+                            <td class="p-3 font-bold text-indigo-700"><span id="valAcc1" class="font-mono">0.00</span> m/s²</td>
+                            <td class="p-3 font-bold text-emerald-700"><span id="valAcc2" class="font-mono">0.00</span> m/s²</td>
+                        </tr>
+                        <!-- 行2: 速度 -->
+                        <tr class="hover:bg-slate-50/50 transition-colors">
+                            <td class="p-3 font-medium text-slate-500">速度 $v$</td>
+                            <td class="p-3 font-bold text-indigo-700"><span id="valVel1" class="font-mono">0.00</span> m/s</td>
+                            <td class="p-3 font-bold text-emerald-700"><span id="valVel2" class="font-mono">0.00</span> m/s</td>
+                        </tr>
+                        <!-- 行3: 質量 -->
+                        <tr class="hover:bg-slate-50/50 transition-colors">
+                            <td class="p-3 font-medium text-slate-500">質量 $m$</td>
+                            <td class="p-3 font-bold text-indigo-700"><span id="valMass1" class="font-mono">80</span> kg</td>
+                            <td class="p-3 font-bold text-emerald-700"><span id="valMass2">40</span> kg</td>
+                        </tr>
+                        <!-- 行4: 受ける力 -->
+                        <tr class="hover:bg-slate-50/50 transition-colors">
+                            <td class="p-3 font-medium text-slate-500">受ける力 $F$</td>
+                            <td class="p-3 font-bold text-indigo-700"><span id="valForce1" class="font-mono">0</span> N <span class="text-xs font-normal text-indigo-500">(左向き)</span></td>
+                            <td class="p-3 font-bold text-emerald-700"><span id="valForce2" class="font-mono">0</span> N <span class="text-xs font-normal text-emerald-500">(右向き)</span></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- 学習アドバイス・ガイド (背景色を目立たない明るいグレーbg-slate-100に、ボーダーを追加してクリーンに変更) -->
+            <div class="bg-slate-100 text-slate-600 p-5 rounded-2xl border border-slate-200 flex flex-col gap-3">
+                <ul class="text-xs space-y-2.5 list-disc pl-4 leading-relaxed text-slate-600">
+                    <li>
+                        大人がもう一方の大人を押すとき、自分自身も同時に相手から全く同じ大きさで反対向きの力を受けています。
+                    </li>
+                    <li>
+                        質量が大きいほど加速度は小さく、質量が小さいほど加速度は大きくなります。押し合っているときの加速度は $a = \frac{F}{m}$ で計算される値になります。
+                    </li>
+                    <li>
+                        押し終わった後は、摩擦がないため両者は等速直線運動を続けます。
+                    </li>
+                </ul>
+            </div>
+
+        </div>
+
+    </main>
+
+    <!-- フッター部分：ボタン群と新しいコピーライト -->
+    <footer class="bg-slate-50 border-t border-slate-200 py-8 px-6 mt-8">
+        <div class="max-w-6xl mx-auto flex flex-col items-center gap-6 sm:gap-8">
+            <div class="flex gap-4 sm:gap-6 text-sm font-bold">
+                <!--//20260810
+                <a href="../6.0_home/home.html" class="flex items-center gap-2 px-6 sm:px-8 py-3 sm:py-4 bg-slate-800 text-white rounded-2xl hover:bg-slate-700 transition-colors">
+                    <i data-lucide="home" class="w-4 h-4"></i> ホーム
+                </a>
+                <a href="../6.1_physics_home/physics_home.html" class="flex items-center gap-2 px-6 sm:px-8 py-3 sm:py-4 bg-slate-800 text-white rounded-2xl hover:bg-slate-700 transition-colors">
+                    <i data-lucide="list" class="w-4 h-4"></i> 物理一覧
+                </a>//20260810-->
+            </div>
+            <p class="text-[10px] sm:text-[11px] text-slate-400">Copyright &copy; 2021-2026 T.Suzuki</p>
+        </div>
+    </footer>
+
+    <!-- 数式表示用の簡易スクリプト (KaTeXによる自動パース) -->
+    <script>
+        // DOMの準備が整ってからKaTeX自動レンダリング
+        document.addEventListener("DOMContentLoaded", function() {
+            if (typeof renderMathInElement !== 'undefined') {
+                renderMathInElement(document.body, {
+                    delimiters: [
+                        {left: '$$', right: '$$', display: true},
+                        {left: '$', right: '$', display: false}
+                    ],
+                    throwOnError: false
+                });
+            }
+        });
+
+        // Lucideアイコンの初期化
+        lucide.createIcons();
+
+        // Canvasと要素のセットアップ
+        const canvas = document.getElementById('simCanvas');
+        const ctx = canvas.getContext('2d');
+
+        // UIコントロール
+        const btnPlay = document.getElementById('btnPlay');
+        const btnReset = document.getElementById('btnReset');
+        const selectDisplayMode = document.getElementById('selectDisplayMode');
+
+        const inputForce = document.getElementById('inputForce');
+        const inputMass1 = document.getElementById('inputMass1');
+        const inputMass2 = document.getElementById('inputMass2');
+
+        const lblForce = document.getElementById('lblForce');
+        const lblMass1 = document.getElementById('lblMass1');
+        const lblMass2 = document.getElementById('lblMass2');
+
+        // 数値表示
+        const valMass1 = document.getElementById('valMass1');
+        const valForce1 = document.getElementById('valForce1');
+        const valAcc1 = document.getElementById('valAcc1');
+        const valVel1 = document.getElementById('valVel1');
+
+        const valMass2 = document.getElementById('valMass2');
+        const valForce2 = document.getElementById('valForce2');
+        const valAcc2 = document.getElementById('valAcc2');
+        const valVel2 = document.getElementById('valVel2');
+        
+        const simState = document.getElementById('simulation-state');
+
+        // シミュレーション物理パラメータ
+        let state = 'idle'; // 'idle' | 'pushing' | 'coasting' | 'paused' | 'ended'
+        let prePausedState = 'pushing'; // 一時停止から再開するための内部フラグ
+        let elapsedTime = 0; // シミュレーション経過時間 (秒)
+        let lastTime = 0;
+
+        // 共通・固定設定 (縦方向の表示領域比率を0.74に調整し、PCで縦幅を小さくした際に頭上がはみ出さないよう微調整)
+        const GROUND_Y_RATIO = 0.74; // 地面の高さ(比率)
+        let PIXELS_PER_METER = 50;  // 1mあたりのピクセル数
+
+        // キャラクターの状態 (大人同士にするため双方同じサイズに設定)
+        const adult = {
+            mass: 80, // kg
+            xm: 0,    // 物理位置 (m)
+            x: 0,     // 描画ピクセル位置 (x)
+            v: 0,     // 速度 (m/s)
+            a: 0,     // 加速度 (m/s^2)
+            force: 0, // 加わる力 (N)
+            width: 80,
+            height: 140,
+            color: '#3f51b5'
+        };
+
+        const child = {
+            mass: 40, // kg (右側の大人の質量デフォルトは40kgに変更)
+            xm: 0,    // 物理位置 (m)
+            x: 0,     // 描画ピクセル位置 (x)
+            v: 0,     // 速度 (m/s)
+            a: 0,     // 加速度 (m/s^2)
+            force: 0, // 加わる力 (N)
+            width: 80,
+            height: 140,
+            color: '#10b981'
+        };
+
+        // 初期設定値
+        let pushForceSetting = 100; // N (デフォルト100N)
+        let pushDuration = 0.40;   // 秒 (0.40秒に固定)
+
+        // Canvasリサイズ対応 (PCからスマホの縦画面まで、常に見切れることなく全体がぴったり入るように設計)
+        function resizeCanvas() {
+            const rect = canvas.parentNode.getBoundingClientRect();
+            canvas.width = rect.width * window.devicePixelRatio;
+            
+            // スマホ縦画面（横幅640px未満）の時はCanvasアスペクト比を4:3にして縦を高くする、PCでは2.8:1を保つ
+            const isMobile = rect.width < 640;
+            const aspect = isMobile ? (3/4) : (1 / 2.8);
+            canvas.height = rect.width * aspect * window.devicePixelRatio;
+            
+            ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
+            
+            const logicalWidth = rect.width;
+            // 画面の幅いっぱいに約11メートル分（-5mから5m＋余白）をちょうど収めるようにPIXELS_PER_METERを決定
+            PIXELS_PER_METER = logicalWidth / 11; 
+            
+            // 画面のサイズが変わってもリセットせず、メートル座標(xm)からピクセル座標(x)を再同期
+            const midX = logicalWidth / 2;
+            const scaleFactor = isMobile ? 0.65 : 1.0;
+            
+            adult.x = midX + adult.xm * PIXELS_PER_METER;
+            child.x = midX + child.xm * PIXELS_PER_METER;
+
+            updateUIValues();
+            draw();
+        }
+        
+        window.addEventListener('resize', resizeCanvas);
+
+        // UI表示の同期
+        function updateUIValues() {
+            pushForceSetting = parseFloat(inputForce.value);
+            adult.mass = parseFloat(inputMass1.value);
+            child.mass = parseFloat(inputMass2.value);
+
+            lblForce.innerText = `${pushForceSetting} N`;
+            lblMass1.innerText = `${adult.mass} kg`;
+            lblMass2.innerText = `${child.mass} kg`;
+
+            valMass1.innerText = adult.mass;
+            valMass2.innerText = child.mass;
+
+            if (state === 'idle') {
+                valForce1.innerText = pushForceSetting;
+                valForce2.innerText = pushForceSetting;
+                
+                // 加速度のプレビュー計算
+                const acc1 = pushForceSetting / adult.mass;
+                const acc2 = pushForceSetting / child.mass;
+                valAcc1.innerText = acc1.toFixed(2);
+                valAcc2.innerText = acc2.toFixed(2);
+                valVel1.innerText = "0.00";
+                valVel2.innerText = "0.00";
+            }
+        }
+
+        // 入力イベントリスナーの登録（運動中に値が変更されたら、自動でリセットする）
+        [inputForce, inputMass1, inputMass2].forEach(input => {
+            input.addEventListener('input', () => {
+                updateUIValues();
+                resetSimulation(); 
+            });
+        });
+
+        // ドロップダウンリストが変更されたときにも自動再描画
+        selectDisplayMode.addEventListener('change', () => {
+            draw();
+        });
+
+        // 物理計算およびリセット
+        function resetSimulation() {
+            state = 'idle';
+            prePausedState = 'pushing';
+            elapsedTime = 0;
+            
+            // スタートボタンの有効化と元スタイルへの復帰（固定幅を維持）
+            btnPlay.disabled = false;
+            btnPlay.className = "flex items-center justify-center gap-1.5 w-32 sm:w-36 py-3 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-semibold rounded-xl shadow-md transition-all";
+            btnPlay.innerHTML = `<i data-lucide="play" class="w-4 h-4 fill-current"></i><span>スタート</span>`;
+            
+            lucide.createIcons();
+            simState.innerText = "運動前";
+            simState.className = "text-slate-500 font-medium";
+
+            const w = canvas.width / window.devicePixelRatio;
+            const midX = w / 2;
+            const isMobile = w < 640;
+            const scaleFactor = isMobile ? 0.65 : 1.0;
+            
+            // 手を水平に合わせる初期の物理位置(m)を設定 (接触面を中心midXにするように配置)
+            adult.xm = - (36 * scaleFactor) / PIXELS_PER_METER; 
+            child.xm = (36 * scaleFactor) / PIXELS_PER_METER;
+
+            // 物理位置からピクセル座標xを同期
+            adult.x = midX + adult.xm * PIXELS_PER_METER;
+            child.x = midX + child.xm * PIXELS_PER_METER;
+            
+            adult.v = 0;
+            adult.a = 0;
+            adult.force = 0;
+
+            child.v = 0;
+            child.a = 0;
+            child.force = 0;
+
+            updateUIValues();
+            draw();
+        }
+
+        // シミュレーションのアップデート
+        function updatePhysics(dt) {
+            if (state === 'idle' || state === 'paused' || state === 'ended') return;
+
+            elapsedTime += dt;
+
+            if (elapsedTime <= pushDuration) {
+                state = 'pushing';
+                simState.innerText = "押し合っています（作用・反作用が発生）";
+                simState.className = "text-red-500 font-bold animate-pulse";
+
+                adult.force = pushForceSetting; 
+                child.force = pushForceSetting; 
+
+                adult.a = adult.force / adult.mass; 
+                child.a = child.force / child.mass;
+
+                adult.v -= adult.a * dt; 
+                child.v += child.a * dt;
+
+                // メートル座標を更新
+                adult.xm += adult.v * dt;
+                child.xm += child.v * dt;
+
+                valForce1.innerText = pushForceSetting;
+                valForce2.innerText = pushForceSetting;
+                valAcc1.innerText = adult.a.toFixed(2);
+                valAcc2.innerText = child.a.toFixed(2);
+
+            } else {
+                state = 'coasting';
+                simState.innerText = "押し終わりました（等速直線運動中）";
+                simState.className = "text-indigo-600 font-bold";
+
+                adult.force = 0;
+                child.force = 0;
+                adult.a = 0;
+                child.a = 0;
+
+                // メートル座標を更新 (一度押し終わった後は力が絶対に再び加わらない仕様を保持)
+                adult.xm += adult.v * dt;
+                child.xm += child.v * dt;
+
+                valForce1.innerText = 0;
+                valForce2.innerText = 0;
+                valAcc1.innerText = "0.00";
+                valAcc2.innerText = "0.00";
+            }
+
+            // メートル座標から描画用ピクセル座標xを再同期
+            const w = canvas.width / window.devicePixelRatio;
+            const midX = w / 2;
+            adult.x = midX + adult.xm * PIXELS_PER_METER;
+            child.x = midX + child.xm * PIXELS_PER_METER;
+
+            valVel1.innerText = Math.abs(adult.v).toFixed(2);
+            valVel2.innerText = Math.abs(child.v).toFixed(2);
+
+            // 両方の人が画面から完全に見切れたときに終了
+            const margin = 100;
+            const screenWidth = w;
+            if (adult.x < -margin && child.x > screenWidth + margin) {
+                state = 'ended';
+                btnPlay.innerHTML = `<span>終了</span>`;
+                btnPlay.disabled = true;
+                // クリック不可・グレーアウトスタイル (固定幅を維持)
+                btnPlay.className = "flex items-center justify-center gap-1.5 w-32 sm:w-36 py-3 bg-slate-300 text-slate-500 font-semibold rounded-xl cursor-not-allowed opacity-60";
+                simState.innerText = "終了しました";
+                simState.className = "text-slate-500 font-medium";
+            }
+        }
+
+        // キャラクター（大人）の描画 (腕を肩の高さから水平に出して押す形状。scaleValでスケール変更可能)
+        function drawAdult(ctx, x, y, isRight = false, scaleVal = 1.0) {
+            ctx.save();
+            ctx.translate(x, y);
+
+            if (isRight) {
+                ctx.scale(-1, 1); // 右側の大人は左右反転
+            }
+
+            // スマホ縦画面時に対応した縮小スケールを適用
+            ctx.scale(scaleVal, scaleVal);
+
+            // スケート靴
+            ctx.fillStyle = '#475569';
+            ctx.fillRect(-25, 0, 50, 6); // 靴底
+            ctx.strokeStyle = '#94a3b8';
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            ctx.moveTo(-30, 6);
+            ctx.lineTo(30, 6); 
+            ctx.stroke();
+
+            // ズボン/脚
+            ctx.fillStyle = '#cbd5e1'; 
+            ctx.strokeStyle = '#475569';
+            ctx.lineWidth = 2;
+            
+            // 左脚
+            ctx.beginPath();
+            ctx.moveTo(-15, -1);
+            ctx.lineTo(-12, -40);
+            ctx.lineTo(-2, -40);
+            ctx.lineTo(-5, -1);
+            ctx.closePath();
+            ctx.fill(); ctx.stroke();
+
+            // 右脚
+            ctx.beginPath();
+            ctx.moveTo(5, -1);
+            ctx.lineTo(2, -40);
+            ctx.lineTo(12, -40);
+            ctx.lineTo(15, -1);
+            ctx.closePath();
+            ctx.fill(); ctx.stroke();
+
+            // 腰・体幹
+            ctx.beginPath();
+            ctx.moveTo(-15, -40);
+            ctx.lineTo(15, -40);
+            ctx.lineTo(10, -85);
+            ctx.lineTo(-10, -85);
+            ctx.closePath();
+            ctx.fill(); ctx.stroke();
+
+            // 服 (左の大人は白、右の大人は薄緑)
+            ctx.fillStyle = isRight ? '#a7f3d0' : '#ffffff';
+            ctx.beginPath();
+            ctx.moveTo(-10, -85);
+            ctx.lineTo(10, -85);
+            ctx.lineTo(14, -125);
+            ctx.lineTo(-14, -125);
+            ctx.closePath();
+            ctx.fill(); ctx.stroke();
+
+            // 頭部・顔
+            ctx.fillStyle = '#ffedd5'; 
+            ctx.beginPath();
+            ctx.arc(0, -137, 14, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.stroke();
+
+            // 髪の毛 (茶色)
+            ctx.fillStyle = '#451a03';
+            ctx.beginPath();
+            ctx.arc(0, -141, 15, Math.PI, 0); 
+            ctx.lineTo(14, -135);
+            ctx.lineTo(10, -140);
+            ctx.lineTo(-10, -140);
+            ctx.closePath();
+            ctx.fill();
+
+            // 目
+            ctx.fillStyle = '#1e293b';
+            ctx.beginPath();
+            ctx.arc(4, -137, 1.8, 0, Math.PI * 2); 
+            ctx.fill();
+
+            // 口 (微笑み)
+            ctx.strokeStyle = '#1e293b';
+            ctx.lineWidth = 1.5;
+            ctx.beginPath();
+            ctx.arc(4, -133, 4, 0.1, Math.PI * 0.7);
+            ctx.stroke();
+
+            // 腕 (肩の高さから完全に真横・水平に伸ばす形状)
+            ctx.fillStyle = isRight ? '#a7f3d0' : '#ffffff';
+            ctx.strokeStyle = '#475569';
+            ctx.lineWidth = 2;
+            
+            // 水平な腕
+            ctx.beginPath();
+            ctx.moveTo(-10, -115);
+            ctx.lineTo(35, -115);
+            ctx.lineTo(35, -105);
+            ctx.lineTo(-10, -105);
+            ctx.closePath();
+            ctx.fill(); ctx.stroke();
+
+            // 手のひら (高さを -110px に一致させ、肩の高さと完全に同期)
+            ctx.fillStyle = '#ffedd5';
+            ctx.beginPath();
+            ctx.arc(36, -110, 5, -Math.PI/2, Math.PI/2);
+            ctx.fill(); ctx.stroke();
+
+            ctx.restore();
+        }
+
+        // 簡易矢印ヘッドの描画関数（座標軸用）
+        function drawArrowHead(ctx, x, y, angle, color, size = 10) {
+            ctx.save();
+            ctx.fillStyle = color;
+            ctx.translate(x, y);
+            ctx.rotate(angle);
+            ctx.beginPath();
+            ctx.moveTo(0, 0);
+            ctx.lineTo(-size, -size / 1.8);
+            ctx.lineTo(-size, size / 1.8);
+            ctx.closePath();
+            ctx.fill();
+            ctx.restore();
+        }
+
+        // 矢印を描画する関数 (文字が人に重なっても読めるように半透明の白背景を追加、矢印線だけを下げる arrowYOffset を追加)
+        function drawArrow(ctx, fromX, fromY, toX, toY, color, width = 4, label = "", fontSize = 13, labelPosition = "up", arrowYOffset = 0) {
+            const headLength = width * 2.2 + 4; 
+            const angle = Math.atan2(toY - fromY, toX - fromX);
+
+            ctx.save();
+            ctx.strokeStyle = color;
+            ctx.fillStyle = color;
+            ctx.lineWidth = width;
+
+            // 矢印線本体のみを指定した arrowYOffset 分だけ下に下げて描画
+            ctx.beginPath();
+            ctx.moveTo(fromX, fromY + arrowYOffset);
+            ctx.lineTo(toX, toY + arrowYOffset);
+            ctx.stroke();
+
+            // 矢の頭も arrowYOffset 分だけ下に下げて描画
+            ctx.beginPath();
+            ctx.moveTo(toX, toY + arrowYOffset);
+            ctx.lineTo(toX - headLength * Math.cos(angle - Math.PI / 6), toY + arrowYOffset - headLength * Math.sin(angle - Math.PI / 6));
+            ctx.lineTo(toX - headLength * Math.cos(angle + Math.PI / 6), toY + arrowYOffset - headLength * Math.sin(angle + Math.PI / 6));
+            ctx.closePath();
+            ctx.fill();
+
+            // 数値表示 (こちらは fromY, toY をそのまま基準にするため、位置は元のまま保持されます)
+            if (label) {
+                ctx.font = `bold ${fontSize}px sans-serif`;
+                ctx.textAlign = 'center';
+                
+                const textWidth = ctx.measureText(label).width;
+                const textHeight = fontSize;
+                const textX = (fromX + toX) / 2;
+                
+                // ラベルの描画Y座標を判定
+                let textY;
+                if (labelPosition === "down") {
+                    // 矢印の下側に配置
+                    textY = Math.max(fromY, toY) + textHeight + 8;
+                } else {
+                    // 矢印の上側に配置
+                    textY = Math.min(fromY, toY) - 6;
+                }
+
+                // 文字の後ろに半透明の白背景を敷く（重なり時の視認性を100%確保するため）
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.85)';
+                ctx.fillRect(textX - textWidth / 2 - 4, textY - textHeight + 2, textWidth + 8, textHeight + 3);
+
+                // テキストの描画
+                ctx.fillStyle = '#1e293b';
+                ctx.fillText(label, textX, textY);
+            }
+            ctx.restore();
+        }
+
+        // 全体の描画
+        function draw() {
+            const w = canvas.width / window.devicePixelRatio;
+            const h = canvas.height / window.devicePixelRatio;
+            const groundY = h * GROUND_Y_RATIO;
+
+            ctx.clearRect(0, 0, w, h);
+
+            const isMobile = w < 640;
+            const forceArrowWidth = isMobile ? 8 : 5;
+            const velocityArrowWidth = isMobile ? 6 : 3.5;
+            const textFontSize = isMobile ? 16 : 13;
+
+            // スマホ縦表示の時はキャラクターのスケールを縮小
+            const scaleFactor = isMobile ? 0.65 : 1.0;
+
+            // 背景：空グラデーション
+            const skyGrad = ctx.createLinearGradient(0, 0, 0, groundY);
+            skyGrad.addColorStop(0, '#bae6fd'); 
+            skyGrad.addColorStop(1, '#ffffff');
+            ctx.fillStyle = skyGrad;
+            ctx.fillRect(0, 0, w, groundY);
+
+            // 氷床の描画 (地面)
+            const iceGrad = ctx.createLinearGradient(0, groundY, 0, h);
+            iceGrad.addColorStop(0, '#e2e8f0'); 
+            iceGrad.addColorStop(0.1, '#cbd5e1');
+            iceGrad.addColorStop(1, '#94a3b8');
+            ctx.fillStyle = iceGrad;
+            ctx.fillRect(0, groundY, w, h - groundY);
+
+            // 氷の反射のキラキラライン
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.6)';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(w * 0.1, groundY + 15); ctx.lineTo(w * 0.3, groundY + 15);
+            ctx.moveTo(w * 0.6, groundY + 25); ctx.lineTo(w * 0.85, groundY + 25);
+            ctx.stroke();
+
+            const adultGroundY = groundY - 6;
+            const childGroundY = groundY - 6;
+
+            // 強調表示モードの確認
+            const displayMode = selectDisplayMode.value;
+
+            // 1. スケーターの描画
+            // --- 左の大人の描画グループ ---
+            ctx.save();
+            if (displayMode === 'highlightRight') {
+                ctx.globalAlpha = 0.2; // 右側が主役の時は、左を20%の薄さにする
+            }
+            drawAdult(ctx, adult.x, adultGroundY, false, scaleFactor);
+            // 質量表示 (キャラクターの縮小に応じて配置高さを調整)
+            ctx.fillStyle = '#1e293b';
+            ctx.font = `bold ${isMobile ? '16px' : '14px'} sans-serif`;
+            ctx.textAlign = 'center';
+            ctx.fillText(`${adult.mass} kg`, adult.x, adultGroundY - 165 * scaleFactor);
+            ctx.restore();
+
+            // --- 右の大人の描画グループ ---
+            ctx.save();
+            if (displayMode === 'highlightLeft') {
+                ctx.globalAlpha = 0.2; // 左側が主役の時は、右を20%の薄さにする
+            }
+            drawAdult(ctx, child.x, childGroundY, true, scaleFactor);
+            // 質量表示 (キャラクターの縮小に応じて配置高さを調整)
+            ctx.fillStyle = '#1e293b';
+            ctx.font = `bold ${isMobile ? '16px' : '14px'} sans-serif`;
+            ctx.textAlign = 'center';
+            ctx.fillText(`${child.mass} kg`, child.x, childGroundY - 165 * scaleFactor);
+            ctx.restore();
+
+            // 手の接触座標を算出 (肩の水平高さ 110px に合わせ、キャラクター縮小を乗算)
+            const adultHandX = adult.x + 36 * scaleFactor;
+            const childHandX = child.x - 36 * scaleFactor;
+            const handY = groundY - 6 - 110 * scaleFactor; 
+
+            // 2. 矢印の形をした数直線（座標軸）の描画
+            const axisY = groundY + 25; 
+            ctx.strokeStyle = '#475569';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(35, axisY);
+            ctx.lineTo(w - 35, axisY);
+            ctx.stroke();
+
+            drawArrowHead(ctx, w - 35, axisY, 0, '#475569', isMobile ? 12 : 10); 
+            drawArrowHead(ctx, 35, axisY, Math.PI, '#475569', isMobile ? 12 : 10); 
+
+            // 座標軸の目盛りと数値を描画
+            const midX = w / 2;
+            ctx.fillStyle = '#475569';
+            ctx.font = `${isMobile ? '12px' : '11px'} sans-serif`;
+            ctx.lineWidth = 1.5;
+            for (let m = -5; m <= 5; m++) {
+                const tickX = midX + m * PIXELS_PER_METER;
+                if (tickX > 45 && tickX < w - 45) {
+                    ctx.beginPath();
+                    ctx.moveTo(tickX, axisY - 5);
+                    ctx.lineTo(tickX, axisY + 5);
+                    ctx.stroke();
+                    
+                    ctx.textAlign = 'center';
+                    ctx.fillText(`${m}m`, tickX, axisY + (isMobile ? 20 : 18));
+                }
+            }
+
+            // 軸ラベル
+            ctx.font = `bold ${isMobile ? '13px' : '11px'} sans-serif`;
+            ctx.textAlign = 'right';
+            ctx.fillText('位置 x (m) ➔', w - 50, axisY - 8);
+
+            // 3. 作用・反作用の力ベクトルの描画 (重なり防止のため矢印の下側に数値を描画)
+            if (state === 'pushing' || state === 'idle') {
+                const arrowLength = pushForceSetting * 0.5; // 力の大きさと矢印の比率を調整
+
+                // 左の大人が受ける力（赤色の反作用矢印）
+                ctx.save();
+                if (displayMode === 'highlightRight') {
+                    ctx.globalAlpha = 0.2;
+                }
+                drawArrow(
+                    ctx, 
+                    adultHandX - 10, 
+                    handY, 
+                    adultHandX - 10 - arrowLength, 
+                    handY, 
+                    '#ef4444', 
+                    forceArrowWidth, 
+                    `${pushForceSetting} N`,
+                    textFontSize,
+                    "down" // お腹側に数値を配置して頭や肩の重なりを完全回避
+                );
+                ctx.restore();
+
+                // 右の大人が受ける力（青色の作用矢印）
+                ctx.save();
+                if (displayMode === 'highlightLeft') {
+                    ctx.globalAlpha = 0.2;
+                }
+                drawArrow(
+                    ctx, 
+                    childHandX + 10, 
+                    handY, 
+                    childHandX + 10 + arrowLength, 
+                    handY, 
+                    '#3b82f6', 
+                    forceArrowWidth, 
+                    `${pushForceSetting} N`,
+                    textFontSize,
+                    "down" // お腹側に数値を配置して頭や肩の重なりを完全回避
+                );
+                ctx.restore();
+
+                if (state === 'pushing') {
+                    const pulseRadius = 8 * scaleFactor + Math.sin(elapsedTime * 30) * 3;
+                    ctx.save();
+                    if (displayMode !== 'normal') {
+                        ctx.globalAlpha = 0.5; // 強調モード時はコンタクトエフェクトを薄く
+                    }
+                    ctx.fillStyle = 'rgba(251, 191, 36, 0.8)';
+                    ctx.beginPath();
+                    ctx.arc((adultHandX + childHandX) / 2, handY, pulseRadius, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.restore();
+                }
+            }
+
+            // 4. 速度ベクトル (数値の位置はそのまま「-215px」の頭上に残し、矢印線のみ 25px 下げて頭部に近づける)
+            if (state === 'pushing' || state === 'coasting') {
+                const velScale = 15; 
+                const velY = adultGroundY - 215 * scaleFactor; 
+                const arrowYOffsetVal = 25 * scaleFactor; // 矢印線の位置だけを25px分下げる
+                
+                // 左の大人の速度ベクトル
+                if (Math.abs(adult.v) > 0.05) {
+                    ctx.save();
+                    if (displayMode === 'highlightRight') {
+                        ctx.globalAlpha = 0.2;
+                    }
+                    drawArrow(
+                        ctx, 
+                        adult.x - 20, 
+                        velY, 
+                        adult.x - 20 - (Math.abs(adult.v) * velScale), 
+                        velY, 
+                        '#6366f1', 
+                        velocityArrowWidth, 
+                        `速度: ${Math.abs(adult.v).toFixed(2)} m/s`,
+                        textFontSize,
+                        "up",
+                        arrowYOffsetVal // 矢印の高さオフセットを適用
+                    );
+                    ctx.restore();
+                }
+
+                // 右の大人の速度ベクトル
+                if (Math.abs(child.v) > 0.05) {
+                    ctx.save();
+                    if (displayMode === 'highlightLeft') {
+                        ctx.globalAlpha = 0.2;
+                    }
+                    drawArrow(
+                        ctx, 
+                        child.x + 15, 
+                        velY, 
+                        child.x + 15 + (Math.abs(child.v) * velScale), 
+                        velY, 
+                        '#10b981', 
+                        velocityArrowWidth, 
+                        `速度: ${Math.abs(child.v).toFixed(2)} m/s`,
+                        textFontSize,
+                        "up",
+                        arrowYOffsetVal // 矢印の高さオフセットを適用
+                    );
+                    ctx.restore();
+                }
+            }
+        }
+
+        // アニメーションループ
+        function animate(timestamp) {
+            if (!lastTime) lastTime = timestamp;
+            let dt = (timestamp - lastTime) / 1000; 
+            lastTime = timestamp;
+
+            if (dt > 0.1) dt = 0.1;
+
+            if (state === 'pushing' || state === 'coasting') {
+                updatePhysics(dt);
+                draw();
+                requestAnimationFrame(animate);
+            } else {
+                lastTime = 0;
+            }
+        }
+
+        // ボタンのクリックイベント処理 (一時停止 ➔ 再開時の再加速バグを完全に修正)
+        btnPlay.addEventListener('click', () => {
+            if (state === 'idle') {
+                // 初回スタート
+                state = 'pushing';
+                elapsedTime = 0;
+                lastTime = 0;
+                btnPlay.innerHTML = `<i data-lucide="pause" class="w-4 h-4 fill-current"></i><span>一時停止</span>`;
+                lucide.createIcons();
+                requestAnimationFrame(animate);
+            } else if (state === 'pushing' || state === 'coasting') {
+                // 一時停止する
+                prePausedState = state; // 現在の状態（押し合い中か等速直線運動中か）を保存
+                state = 'paused';
+                btnPlay.innerHTML = `<i data-lucide="play" class="w-4 h-4 fill-current"></i><span>再開</span>`;
+                lucide.createIcons();
+                
+                // 元の運動状態に合わせて「※一時停止中」を付与
+                let baseText = "";
+                if (prePausedState === 'pushing') {
+                    baseText = "押し合っています（作用・反作用が発生）";
+                } else if (prePausedState === 'coasting') {
+                    baseText = "押し終わりました（等速直線運動中）";
+                }
+                simState.innerText = baseText + " ※一時停止中";
+                simState.className = "text-amber-500 font-bold";
+            } else if (state === 'paused') {
+                // 一時停止から再開
+                state = prePausedState; // 保存した運動状態をそのまま復元
+                lastTime = 0; // dtの計算をリセット
+                btnPlay.innerHTML = `<i data-lucide="pause" class="w-4 h-4 fill-current"></i><span>一時停止</span>`;
+                lucide.createIcons();
+                requestAnimationFrame(animate);
+            }
+        });
+
+        btnReset.addEventListener('click', () => {
+            resetSimulation();
+        });
+
+        // 読み込み完了時、初回初期化
+        window.onload = function() {
+            resizeCanvas();
+            resetSimulation();
+        };
+    </script>
+</body>
+</html>

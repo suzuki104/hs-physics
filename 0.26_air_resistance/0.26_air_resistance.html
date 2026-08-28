@@ -1,0 +1,476 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>空気抵抗と終端速度</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        canvas {
+            background: #f8fafc;
+        }
+        .math { font-family: "Times New Roman", Times, serif; font-style: italic; }
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen p-4 md:p-8">
+    <div class="max-w-7xl mx-auto bg-white rounded-xl shadow-lg overflow-hidden">
+        <div class="p-6 border-b border-gray-200 text-center">
+            <h1 class="text-2xl font-bold text-gray-800">空気抵抗と終端速度</h1>
+        </div>
+
+        <div class="p-4 flex flex-col gap-6">
+            <!-- 上段：アニメーションとグラフを横に並べる -->
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <!-- アニメーション表示 -->
+                <div class="flex flex-col items-center">
+                    <div class="w-full flex justify-center gap-2 mb-4">
+                        <button id="startStopBtn" class="w-1/2 bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg transition shadow-md">
+                            落下開始
+                        </button>
+                        <button id="resetBtn" class="w-1/2 bg-gray-500 hover:bg-gray-600 text-white font-bold py-3 px-6 rounded-lg transition shadow-md">
+                            リセット
+                        </button>
+                    </div>
+
+                    <div class="flex justify-between w-full mb-2">
+                        <span class="text-xs text-blue-600 font-mono">高度: <span id="currentHeight">0</span> m</span>
+                    </div>
+                    <canvas id="simCanvas" class="w-full rounded-lg border border-gray-300 shadow-inner"></canvas>
+                    
+                    <div class="w-full mt-2 flex justify-center gap-4 text-xs font-bold">
+                        <span class="text-red-600">↓ 重力 (mg)</span>
+                        <span class="text-green-700">↑ 抵抗力 (kv)</span>
+                    </div>
+                </div>
+
+                <!-- v-t グラフ -->
+                <div class="flex flex-col items-center justify-end">
+                    <span class="text-sm font-bold mb-2 text-gray-700">v-t グラフ</span>
+                    <canvas id="graphCanvas" class="w-full rounded-lg border border-gray-300 shadow-inner"></canvas>
+                </div>
+            </div>
+            
+            <!-- 下段：コントロールパネルを横長に配置 -->
+            <div class="bg-gray-50 p-6 rounded-lg border border-gray-100">
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+                    <div class="hidden">
+                        <input type="range" id="paramG" value="9.8">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">抵抗係数 <span class="math">k</span>: <span id="valK">0.5</span> kg/m</label>
+                        <input type="range" id="paramK" min="0.05" max="2" step="0.05" value="0.5" class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">物体の質量 <span class="math">m</span>: <span id="valM">1.0</span> kg</label>
+                        <input type="range" id="paramM" min="0.5" max="5" step="0.1" value="1" class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">落下の高さ: <span id="valH">200</span> m</label>
+                        <input type="range" id="paramH" min="50" max="1000" step="50" value="200" class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer">
+                    </div>
+                </div>
+                
+                <div class="mt-6 flex flex-wrap items-center justify-between gap-4 pt-4 border-t border-gray-200">
+                    <div class="flex gap-6 text-xs font-medium">
+                        <p class="flex items-center"><span class="w-3 h-3 bg-blue-500 inline-block mr-2 rounded-full"></span> 真空（抵抗なし）</p>
+                        <p class="flex items-center"><span class="w-3 h-3 bg-gray-500 inline-block mr-2 rounded-full"></span> 空気中 (<span class="math">R=kv</span>)</p>
+                    </div>
+                    <div class="text-sm font-bold text-red-600 bg-white px-4 py-2 rounded-full border border-red-100 shadow-sm">
+                        終端速度 <span class="math">v<sub>f</sub></span>: <span id="terminalV">0.00</span> m/s
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 解説エリア -->
+        <div class="p-6 bg-gray-50 border-t border-gray-200">
+            <div class="w-full">
+                <p class="text-sm text-gray-700 italic leading-relaxed">
+                    速度が上がるにつれて空気抵抗（上向きの力）も大きくなります。
+                    最終的に重力と同じ大きさになると、物体はそれ以上加速できなくなります。
+                </p>
+            </div>
+        </div>
+
+        <!-- フッター -->
+        <div class="p-8 border-t border-gray-200 text-center bg-white">
+            <!--//20260810  <div class="flex justify-center gap-4 mb-6">
+                <a href="../6.0_home/home.html" class="bg-gray-800 hover:bg-gray-900 text-white font-bold py-2 px-6 rounded transition shadow">ホーム</a>
+                <a href="../6.1_physics_home/physics_home.html" class="bg-gray-800 hover:bg-gray-900 text-white font-bold py-2 px-6 rounded transition shadow">物理一覧</a>
+            </div>//20260810 -->
+            <p class="text-gray-500 text-sm">
+                Copyright &copy; 2021-<span id="currentYear"></span> T.Suzuki
+            </p>
+        </div>
+    </div>
+
+    <script>
+        const simCanvas = document.getElementById('simCanvas');
+        const graphCanvas = document.getElementById('graphCanvas');
+        const simCtx = simCanvas.getContext('2d');
+        const graphCtx = graphCanvas.getContext('2d');
+        const startStopBtn = document.getElementById('startStopBtn');
+        const resetBtn = document.getElementById('resetBtn');
+        
+        document.getElementById('currentYear').textContent = new Date().getFullYear();
+
+        const params = { g: 9.8, k: 0.5, m: 1.0, h_target: 200 };
+        let objects = [];
+        let animationId;
+        let lastTime = 0;
+        let elapsed = 0;
+        let isRunning = false;
+        let cameraY = 0;
+        let lastWidth = 0;
+
+        const PIXELS_PER_METER = 5;
+        const MAX_GRAPH_TIME = 30; 
+        const FORCE_SCALE = 5; 
+
+        function initObjects() {
+            objects = [
+                { name: '真空中', x: simCanvas.width * 0.35, y: 0, v: 0, color: '#3b82f6', hasAir: false, history: [{t: 0, v: 0}], grounded: false, labelAlign: 'right' },
+                { name: '空気中', x: simCanvas.width * 0.65, y: 0, v: 0, color: '#6b7280', hasAir: true, history: [{t: 0, v: 0}], grounded: false, labelAlign: 'left' }
+            ];
+            elapsed = 0;
+            cameraY = 0;
+            lastTime = performance.now();
+        }
+
+        function updateParams() {
+            params.g = 9.8;
+            params.k = parseFloat(document.getElementById('paramK').value);
+            params.m = parseFloat(document.getElementById('paramM').value);
+            params.h_target = parseFloat(document.getElementById('paramH').value);
+            
+            document.getElementById('valK').textContent = params.k.toFixed(2);
+            document.getElementById('valM').textContent = params.m.toFixed(1);
+            document.getElementById('valH').textContent = params.h_target;
+            
+            const vt = (params.m * params.g) / params.k;
+            document.getElementById('terminalV').textContent = vt.toFixed(2);
+        }
+
+        function resize() {
+            const currentWidth = simCanvas.parentElement.clientWidth;
+            if (currentWidth === lastWidth) return;
+            lastWidth = currentWidth;
+
+            const isMobile = window.innerWidth < 1024;
+            const targetHeight = isMobile ? 300 : 400;
+
+            simCanvas.width = currentWidth;
+            simCanvas.height = targetHeight;
+            graphCanvas.width = graphCanvas.parentElement.clientWidth;
+            graphCanvas.height = targetHeight;
+            
+            initObjects();
+            isRunning = false;
+            updateBtnState();
+            drawStatic();
+        }
+
+        function drawStatic() {
+            simCtx.clearRect(0, 0, simCanvas.width, simCanvas.height);
+            drawBackground();
+            objects.forEach(obj => drawBall(obj));
+            drawGraph();
+        }
+
+        function drawArrow(ctx, x, y, length, color) {
+            if (Math.abs(length) < 1) return;
+            ctx.save();
+            
+            const headWidth = 14; 
+            const headLength = 16;
+            const direction = length > 0 ? 1 : -1;
+
+            ctx.beginPath();
+            ctx.strokeStyle = color;
+            ctx.fillStyle = color;
+            ctx.lineWidth = 4;
+            ctx.lineCap = 'round';
+            ctx.moveTo(x, y);
+            ctx.lineTo(x, y + length);
+            ctx.stroke();
+
+            ctx.beginPath();
+            ctx.moveTo(x - headWidth/2, y + length - headLength * direction);
+            ctx.lineTo(x, y + length);
+            ctx.lineTo(x + headWidth/2, y + length - headLength * direction);
+            ctx.fill();
+
+            ctx.restore();
+        }
+
+        function drawBackground() {
+            simCtx.save();
+            simCtx.translate(0, -cameraY * PIXELS_PER_METER);
+
+            simCtx.strokeStyle = '#e2e8f0';
+            simCtx.lineWidth = 1;
+            simCtx.font = '10px monospace';
+            simCtx.fillStyle = '#94a3b8';
+            
+            for(let m = 0; m <= params.h_target; m += 10) {
+                const y = m * PIXELS_PER_METER + 50;
+                simCtx.beginPath();
+                simCtx.moveTo(0, y);
+                simCtx.lineTo(simCanvas.width, y);
+                simCtx.stroke();
+                simCtx.fillText(`${m}m`, 5, y - 2);
+            }
+
+            const groundY = params.h_target * PIXELS_PER_METER + 50;
+            simCtx.fillStyle = '#475569';
+            simCtx.fillRect(0, groundY, simCanvas.width, 200);
+            simCtx.fillStyle = '#ffffff';
+            simCtx.textAlign = 'center';
+            simCtx.font = 'bold 24px sans-serif';
+            simCtx.fillText("地面", simCanvas.width/2, groundY + 45);
+            
+            simCtx.restore();
+        }
+
+        function drawBall(obj) {
+            simCtx.save();
+            const drawY = (obj.y * PIXELS_PER_METER) - (cameraY * PIXELS_PER_METER) + 50;
+            
+            simCtx.beginPath();
+            simCtx.arc(obj.x, drawY, 14, 0, Math.PI * 2);
+            simCtx.fillStyle = obj.color;
+            simCtx.fill();
+
+            const gravityForce = params.m * params.g;
+            drawArrow(simCtx, obj.x, drawY, gravityForce * FORCE_SCALE, '#dc2626');
+
+            if (!obj.grounded && obj.hasAir) {
+                const dragForce = params.k * obj.v;
+                if (dragForce > 0.1) {
+                    drawArrow(simCtx, obj.x, drawY, -dragForce * FORCE_SCALE, '#15803d');
+                }
+            }
+            
+            const labelOffsetX = obj.labelAlign === 'right' ? -25 : 25;
+            simCtx.textAlign = obj.labelAlign;
+            simCtx.fillStyle = '#1f2937';
+            
+            simCtx.font = 'bold 12px sans-serif';
+            simCtx.fillText(obj.name, obj.x + labelOffsetX, drawY - 5);
+            
+            if (!obj.grounded) {
+                simCtx.font = 'bold 13px monospace';
+                simCtx.fillText(`${obj.v.toFixed(1)} m/s`, obj.x + labelOffsetX, drawY + 12);
+            }
+            
+            simCtx.restore();
+        }
+
+        function drawGraph() {
+            const w = graphCanvas.width;
+            const h = graphCanvas.height;
+            const padding = 45;
+            const arrowSize = 8;
+            
+            graphCtx.clearRect(0, 0, w, h);
+
+            const timeScale = (w - padding * 2) / MAX_GRAPH_TIME;
+            const vt = (params.m * params.g) / params.k;
+            const maxVInHistory = Math.max(...objects.flatMap(o => o.history.map(h => h.v)), vt, 10);
+            const maxVelDisplay = Math.ceil((maxVInHistory + 10) / 20) * 20;
+            const velScale = (h - padding * 2) / maxVelDisplay;
+
+            graphCtx.beginPath();
+            graphCtx.strokeStyle = '#374151';
+            graphCtx.fillStyle = '#374151';
+            graphCtx.lineWidth = 1.5;
+            
+            graphCtx.moveTo(padding, h - padding);
+            graphCtx.lineTo(padding, padding / 2);
+            graphCtx.stroke();
+            graphCtx.beginPath();
+            graphCtx.moveTo(padding - 4, padding / 2 + arrowSize);
+            graphCtx.lineTo(padding, padding / 2);
+            graphCtx.lineTo(padding + 4, padding / 2 + arrowSize);
+            graphCtx.fill();
+
+            graphCtx.beginPath();
+            graphCtx.moveTo(padding, h - padding);
+            graphCtx.lineTo(w - padding / 2, h - padding);
+            graphCtx.stroke();
+            graphCtx.beginPath();
+            graphCtx.moveTo(w - padding / 2 - arrowSize, h - padding - 4);
+            graphCtx.lineTo(w - padding / 2, h - padding);
+            graphCtx.lineTo(w - padding / 2 - arrowSize, h - padding + 4);
+            graphCtx.fill();
+
+            // 横軸グリッドを点線から実線に変更
+            graphCtx.setLineDash([]);
+            graphCtx.strokeStyle = '#f1f5f9';
+            graphCtx.font = '10px sans-serif';
+            graphCtx.textAlign = 'right';
+            for (let v = 0; v <= maxVelDisplay; v += 20) {
+                const y = h - padding - v * velScale;
+                if (y < padding) continue;
+                graphCtx.beginPath();
+                graphCtx.moveTo(padding, y);
+                graphCtx.lineTo(w - padding, y);
+                graphCtx.stroke();
+                graphCtx.fillStyle = '#94a3b8';
+                if (v !== 0) graphCtx.fillText(v, padding - 5, y + 4);
+            }
+
+            const vtY = h - padding - vt * velScale;
+            if (vtY > padding) {
+                graphCtx.beginPath();
+                graphCtx.strokeStyle = 'rgba(239, 68, 68, 0.4)';
+                graphCtx.moveTo(padding, vtY);
+                graphCtx.lineTo(w - padding, vtY);
+                graphCtx.stroke();
+                graphCtx.fillStyle = '#ef4444';
+                graphCtx.textAlign = 'right';
+                graphCtx.fillText(`終端速度 = ${vt.toFixed(1)} m/s`, w - padding - 5, vtY - 5);
+            }
+
+            objects.forEach(obj => {
+                if (obj.history.length < 2) return;
+                graphCtx.beginPath();
+                graphCtx.strokeStyle = obj.color;
+                graphCtx.lineWidth = 2;
+                obj.history.forEach((point, i) => {
+                    const tx = padding + point.t * timeScale;
+                    const ty = h - padding - point.v * velScale;
+                    if (ty < padding) return;
+                    if (i === 0) graphCtx.moveTo(tx, ty);
+                    else graphCtx.lineTo(tx, ty);
+                });
+                graphCtx.stroke();
+            });
+
+            graphCtx.textAlign = 'left';
+            graphCtx.fillStyle = '#374151';
+            graphCtx.font = 'bold 10px sans-serif';
+            graphCtx.fillText('v [m/s]', padding - 40, padding / 2 - 10);
+            graphCtx.fillText('t [s]', w - padding / 2, h - padding + 20);
+        }
+
+        function updateBtnState() {
+            const allGrounded = objects.every(o => o.grounded);
+            
+            if (allGrounded && elapsed > 0) {
+                startStopBtn.textContent = 'リスタート';
+                startStopBtn.classList.remove('bg-red-600', 'hover:bg-red-700', 'bg-blue-600', 'hover:bg-blue-700');
+                startStopBtn.classList.add('bg-green-600', 'hover:bg-green-700');
+            } else if (isRunning) {
+                startStopBtn.textContent = 'ストップ';
+                startStopBtn.classList.remove('bg-blue-600', 'hover:bg-blue-700', 'bg-green-600', 'hover:bg-green-700');
+                startStopBtn.classList.add('bg-red-600', 'hover:bg-red-700');
+            } else {
+                if (elapsed > 0) {
+                    startStopBtn.textContent = '再開';
+                } else {
+                    startStopBtn.textContent = '落下開始';
+                }
+                startStopBtn.classList.remove('bg-red-600', 'hover:bg-red-700', 'bg-green-600', 'hover:bg-green-700');
+                startStopBtn.classList.add('bg-blue-600', 'hover:bg-blue-700');
+            }
+        }
+
+        function animate(currentTime) {
+            if (!isRunning) {
+                lastTime = currentTime;
+                animationId = requestAnimationFrame(animate);
+                return;
+            }
+
+            const dt = (currentTime - lastTime) / 1000;
+            lastTime = currentTime;
+            const simDt = Math.min(dt, 0.03); 
+            elapsed += simDt;
+
+            simCtx.clearRect(0, 0, simCanvas.width, simCanvas.height);
+            drawBackground();
+
+            let allGrounded = true;
+
+            objects.forEach(obj => {
+                if (!obj.grounded) {
+                    allGrounded = false;
+                    let acceleration = obj.hasAir ? (params.g - (params.k / params.m) * obj.v) : params.g;
+                    obj.v += acceleration * simDt;
+                    obj.y += obj.v * simDt;
+
+                    if (obj.y >= params.h_target) {
+                        obj.y = params.h_target;
+                        if (elapsed <= MAX_GRAPH_TIME) {
+                            obj.history.push({ t: elapsed, v: obj.v });
+                        }
+                        obj.v = 0; 
+                        obj.grounded = true;
+                    } else {
+                        if (elapsed <= MAX_GRAPH_TIME) {
+                            obj.history.push({ t: elapsed, v: obj.v });
+                        }
+                    }
+                }
+                drawBall(obj);
+            });
+
+            if (objects.length > 1) {
+                if (!objects[1].grounded) {
+                    cameraY = Math.max(0, objects[1].y - 20);
+                } else if (!objects[0].grounded) {
+                    cameraY = Math.max(0, objects[0].y - 20);
+                }
+            }
+            
+            document.getElementById('currentHeight').textContent = Math.max(0, params.h_target - (objects[1]?.y || 0)).toFixed(1);
+
+            if (allGrounded || elapsed > MAX_GRAPH_TIME) {
+                isRunning = false;
+                updateBtnState();
+            }
+
+            drawGraph();
+            animationId = requestAnimationFrame(animate);
+        }
+
+        window.addEventListener('resize', resize);
+        
+        startStopBtn.addEventListener('click', () => {
+            const allGrounded = objects.every(o => o.grounded);
+            
+            if (allGrounded && elapsed > 0) {
+                initObjects();
+                isRunning = true;
+            } else {
+                isRunning = !isRunning;
+            }
+            
+            if (isRunning) lastTime = performance.now();
+            updateBtnState();
+        });
+
+        resetBtn.addEventListener('click', () => {
+            isRunning = false;
+            initObjects();
+            updateBtnState();
+            drawStatic();
+        });
+
+        ['paramK', 'paramM', 'paramH'].forEach(id => {
+            document.getElementById(id).addEventListener('input', () => {
+                updateParams();
+                isRunning = false;
+                initObjects();
+                updateBtnState();
+                drawStatic();
+            });
+        });
+
+        updateParams();
+        resize();
+        animationId = requestAnimationFrame(animate);
+    </script>
+</body>
+</html>

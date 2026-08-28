@@ -1,0 +1,854 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>花火の運動|高校物理アニメーション教材</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght=300;400;600;700&display=swap');
+        body {
+            font-family: 'Inter', 'Helvetica Neue', Arial, 'Hiragino Kaku Gothic ProN', sans-serif;
+            background-color: #0b0f19;
+        }
+        /* カスタムスクロールバー */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #0f172a;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #334155;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #475569;
+        }
+    </style>
+</head>
+<body class="text-slate-100 min-h-screen p-4 md:p-6 flex flex-col justify-between">
+
+    <div class="max-w-7xl mx-auto w-full flex-grow flex flex-col gap-6">
+        <!-- Header (Centered with custom titles) -->
+        <header class="flex flex-col justify-center items-center border-b border-slate-800 pb-4 text-center">
+            <div class="w-full">
+                <h1 class="text-2xl md:text-3xl font-extrabold bg-gradient-to-r from-blue-400 via-indigo-400 to-cyan-400 bg-clip-text text-transparent">
+                    花火の運動
+                </h1>
+                <p class="text-xs md:text-sm text-slate-400 mt-1">初速度の大きさが等しい4つの運動（投げ上げ、投げ下ろし、水平投射）による円</p>
+            </div>
+        </header>
+
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
+            
+            <!-- Left Side: Simulator and Graph (8 Cols) -->
+            <div class="lg:col-span-8 flex flex-col gap-4">
+                
+                <!-- Simulation Controls & Speed & Seek Bar -->
+                <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-xl flex flex-col gap-4">
+                    <!-- Seek bar & Timeline (Relabeled to 時間) -->
+                    <div class="flex items-center gap-4">
+                        <span class="text-xs font-bold text-slate-400 w-12 text-right">時間</span>
+                        <input type="range" id="timeSeeker" min="0" max="10" step="0.01" value="0" class="flex-grow h-2 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-blue-500">
+                        <span class="text-xs font-mono text-slate-400 w-16" id="maxTimeDisplay">Max: 10.0s</span>
+                    </div>
+
+                    <!-- Main Buttons -->
+                    <div class="flex flex-wrap justify-between items-center gap-2 sm:gap-4 border-t border-slate-800/60 pt-3">
+                        <div class="flex items-center gap-1.5 sm:gap-2 w-full sm:w-auto justify-between sm:justify-start">
+                            <button id="btnPrevFrame" class="w-8 h-8 sm:w-10 sm:h-10 rounded-lg bg-slate-800 hover:bg-slate-700 active:bg-slate-600 transition flex items-center justify-center border border-slate-700 text-slate-300 text-xs sm:text-sm" title="1フレーム戻る">
+                                <i class="fa-solid fa-chevron-left"></i>
+                            </button>
+                            <!-- Fixed size play button to prevent resizing on label changes -->
+                            <button id="btnPlay" class="w-24 sm:w-28 h-8 sm:h-10 rounded-lg bg-blue-600 hover:bg-blue-500 active:bg-blue-700 text-white font-bold transition flex items-center justify-center gap-1 sm:gap-2 shadow-lg shadow-blue-900/30 disabled:opacity-50 disabled:cursor-not-allowed text-xs sm:text-sm">
+                                <i class="fa-solid fa-play" id="playIcon"></i> <span id="playText">再生</span>
+                            </button>
+                            <button id="btnNextFrame" class="w-8 h-8 sm:w-10 sm:h-10 rounded-lg bg-slate-800 hover:bg-slate-700 active:bg-slate-600 transition flex items-center justify-center border border-slate-700 text-slate-300 text-xs sm:text-sm" title="1フレーム進む">
+                                <i class="fa-solid fa-chevron-right"></i>
+                            </button>
+                            <button id="btnReset" class="px-2.5 sm:px-4 h-8 sm:h-10 rounded-lg bg-slate-800 hover:bg-slate-700 active:bg-slate-600 border border-slate-700 font-semibold text-slate-300 transition flex items-center justify-center gap-1 sm:gap-2 text-xs sm:text-sm">
+                                <i class="fa-solid fa-rotate-left"></i> リセット
+                            </button>
+                        </div>
+
+                        <!-- Speed selector -->
+                        <div class="flex items-center gap-2">
+                            <span class="text-xs text-slate-400 font-semibold">再生速度:</span>
+                            <div class="flex bg-slate-950 p-1 rounded-lg border border-slate-800">
+                                <button class="speed-btn px-2 py-1 text-xs rounded transition text-slate-400 hover:text-white" data-speed="0.1">0.1x</button>
+                                <button class="speed-btn px-2.5 py-1 text-xs rounded transition text-slate-400 hover:text-white" data-speed="0.25">0.25x</button>
+                                <button class="speed-btn px-2.5 py-1 text-xs rounded transition text-slate-400 hover:text-white font-bold bg-slate-800 text-blue-400" id="defaultSpeedBtn" data-speed="1">1.0x (等倍)</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Main Canvas Card -->
+                <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-2xl relative overflow-hidden flex flex-col">
+                    <div class="flex justify-between items-center mb-2">
+                        <span class="text-xs font-semibold uppercase tracking-wider text-slate-400 flex items-center gap-2">
+                            <span class="w-2 h-2 rounded-full bg-blue-500 animate-pulse"></span>アニメーション
+                        </span>
+                        <!-- Time Display -->
+                        <div class="text-sm font-mono text-cyan-400 bg-slate-950 px-3 py-1 rounded-md border border-slate-800 flex items-center gap-1.5">
+                            <i class="fa-regular fa-clock"></i>
+                            <span>時刻 t = </span>
+                            <span id="timeDisplay" class="font-bold">0.00</span>
+                            <span>s</span>
+                        </div>
+                    </div>
+                    
+                    <div class="relative w-full aspect-[2/1] min-h-[300px] bg-slate-950 rounded-xl border border-slate-800 overflow-hidden">
+                        <canvas id="simCanvas" class="absolute inset-0 w-full h-full cursor-crosshair"></canvas>
+                    </div>
+                </div>
+
+                <!-- Real-time Plotting Panel -->
+                <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-xl flex flex-col gap-3">
+                    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center border-b border-slate-800 pb-2 gap-2">
+                        <!-- Uppercase removed, italic font-serif added for formula styling -->
+                        <span class="text-xs font-semibold tracking-wider text-slate-400 flex items-center gap-2">
+                            <i class="fa-solid fa-chart-line text-indigo-400"></i><span class="italic font-serif text-sm">y</span>-<span class="italic font-serif text-sm">t</span>グラフと<span class="italic font-serif text-sm">v<sub>y</sub></span>-<span class="italic font-serif text-sm">t</span>グラフ
+                        </span>
+                        <!-- Graph Selection Tabs with subscript y for vy-t -->
+                        <div class="flex bg-slate-950 p-1 rounded-lg border border-slate-800 text-xs">
+                            <button class="graph-tab px-3 py-1.5 rounded font-medium transition text-slate-300 bg-slate-800 text-blue-400" data-graph="y-t">y-t (高さ)</button>
+                            <button class="graph-tab px-3 py-1.5 rounded font-medium transition text-slate-400 hover:text-white" data-graph="vy-t">v<sub>y</sub>-t (鉛直速度)</button>
+                        </div>
+                    </div>
+                    <div class="relative w-full h-[180px] bg-slate-950 rounded-xl border border-slate-800 overflow-hidden">
+                        <canvas id="graphCanvas" class="absolute inset-0 w-full h-full"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right Side Column -->
+            <div class="lg:col-span-4 flex flex-col gap-6">
+                <!-- Parameters Card -->
+                <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-2xl flex flex-col gap-4">
+                    <h2 class="text-sm font-bold uppercase tracking-wider text-slate-400 border-b border-slate-800 pb-2 flex items-center gap-2">
+                        <i class="fa-solid fa-sliders text-blue-400"></i>パラメータ設定
+                    </h2>
+                    
+                    <!-- Parameter: v0 -->
+                    <div class="flex flex-col gap-1.5">
+                        <div class="flex justify-between items-center text-xs">
+                            <span class="font-semibold text-slate-300">初速度の大きさ <span class="italic">v₀</span></span>
+                            <span class="font-mono text-cyan-400 bg-slate-950 px-2 py-0.5 rounded border border-slate-800" id="valV0">20.0 m/s</span>
+                        </div>
+                        <input type="range" id="paramV0" min="5" max="35" step="0.5" value="20" class="h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-cyan-500">
+                    </div>
+
+                    <!-- Display options (Configured to 2 Columns Grid Layout) -->
+                    <div class="border-t border-slate-800 pt-3 flex flex-col gap-2.5">
+                        <span class="text-xs font-bold text-slate-400 uppercase tracking-wider"></span>
+                        
+                        <div class="grid grid-cols-2 gap-2 text-[11px]">
+                            <!-- Strobe (Default Checked) -->
+                            <label class="flex items-center gap-2 cursor-pointer text-slate-300 select-none bg-slate-950/45 p-2 rounded border border-slate-800/80 hover:bg-slate-950 transition">
+                                <input type="checkbox" id="showStrobe" checked class="w-3.5 h-3.5 rounded border-slate-700 text-blue-600 bg-slate-950 accent-blue-500">
+                                軌跡を表示
+                            </label>
+                            
+                            <!-- Circle (Default Checked) -->
+                            <label class="flex items-center gap-2 cursor-pointer text-slate-300 select-none bg-slate-950/45 p-2 rounded border border-slate-800/80 hover:bg-slate-950 transition">
+                                <input type="checkbox" id="showCircle" checked class="w-3.5 h-3.5 rounded border-slate-700 text-blue-600 bg-slate-950 accent-blue-500">
+                                4点を通る円と中心を表示
+                            </label>
+
+                            <!-- Vector (Default Unchecked) -->
+                            <label class="flex items-center gap-2 cursor-pointer text-slate-300 select-none bg-slate-950/45 p-2 rounded border border-slate-800/80 hover:bg-slate-950 transition">
+                                <input type="checkbox" id="showVectors" class="w-3.5 h-3.5 rounded border-slate-700 text-blue-600 bg-slate-950 accent-blue-500">
+                                速度ベクトルを表示
+                            </label>
+
+                            <!-- Label (Default Unchecked) -->
+                            <label class="flex items-center gap-2 cursor-pointer text-slate-300 select-none bg-slate-950/45 p-2 rounded border border-slate-800/80 hover:bg-slate-950 transition">
+                                <input type="checkbox" id="showLabels" class="w-3.5 h-3.5 rounded border-slate-700 text-blue-600 bg-slate-950 accent-blue-500">
+                                運動の名称を表示
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Object Display Toggles (Compact style without Landing Time) -->
+                <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-2xl flex flex-col gap-3">
+                    <h2 class="text-sm font-bold uppercase tracking-wider text-slate-400 border-b border-slate-800 pb-2 flex items-center gap-2">
+                        <i class="fa-solid fa-eye text-emerald-400"></i>表示のチェック
+                    </h2>
+                    <p class="text-[11px] text-slate-400 mb-1">表示したい運動のチェックを入れてください。</p>
+                    
+                    <div class="grid grid-cols-2 gap-2">
+                        <!-- Up -->
+                        <label class="flex items-center gap-2 bg-slate-950/60 p-2 rounded-xl border border-slate-800 hover:border-slate-700 transition cursor-pointer text-xs font-semibold text-slate-200">
+                            <input type="checkbox" id="chk_up" checked class="w-3.5 h-3.5 rounded accent-yellow-400">
+                            <span class="w-2.5 h-2.5 rounded-full bg-yellow-400"></span> 鉛直投げ上げ
+                        </label>
+                        <!-- Down -->
+                        <label class="flex items-center gap-2 bg-slate-950/60 p-2 rounded-xl border border-slate-800 hover:border-slate-700 transition cursor-pointer text-xs font-semibold text-slate-200">
+                            <input type="checkbox" id="chk_down" checked class="w-3.5 h-3.5 rounded accent-red-400">
+                            <span class="w-2.5 h-2.5 rounded-full bg-red-400"></span> 鉛直投げ下ろし
+                        </label>
+                        <!-- Right -->
+                        <label class="flex items-center gap-2 bg-slate-950/60 p-2 rounded-xl border border-slate-800 hover:border-slate-700 transition cursor-pointer text-xs font-semibold text-slate-200">
+                            <input type="checkbox" id="chk_right" checked class="w-3.5 h-3.5 rounded accent-green-400">
+                            <span class="w-2.5 h-2.5 rounded-full bg-green-400"></span> 水平投射（右）
+                        </label>
+                        <!-- Left -->
+                        <label class="flex items-center gap-2 bg-slate-950/60 p-2 rounded-xl border border-slate-800 hover:border-slate-700 transition cursor-pointer text-xs font-semibold text-slate-200">
+                            <input type="checkbox" id="chk_left" checked class="w-3.5 h-3.5 rounded accent-cyan-400">
+                            <span class="w-2.5 h-2.5 rounded-full bg-cyan-400"></span> 水平投射（左）
+                        </label>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Physics Explanations bottom panel -->
+        <footer class="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl mt-6">
+            <h3 class="text-sm font-bold text-slate-300 mb-3 flex items-center gap-2">
+                <i class="fa-solid fa-graduation-cap text-indigo-400"></i>解説
+            </h3>
+            <div class="text-xs text-slate-400 leading-relaxed">
+                <p>「4点を通る円と中心を表示」をオンにすると、同じ初速度で全方向に打ち出された物体が常にひとつの「円」の円周上に位置すること（花火が丸く広がる性質）を視覚的に理解できます。時間経過とともに円が拡大しながら落下していくのを観察しましょう。</p>
+            </div>
+        </footer>
+
+        <!-- Bottom Links and Copyright Panel -->
+        <div class="flex flex-col items-center gap-6 sm:gap-8 pt-6 sm:pt-8 border-t border-slate-800">
+            <div class="flex gap-4 sm:gap-6 text-sm font-bold">
+                <a href="../6.0_home/home.html" class="flex items-center gap-2 px-6 sm:px-8 py-3 sm:py-4 bg-slate-800 text-white rounded-2xl hover:bg-slate-700 transition-colors">
+                    <i class="fa-solid fa-house"></i> ホーム
+                </a>
+                <a href="../6.1_physics_home/physics_home.html" class="flex items-center gap-2 px-6 sm:px-8 py-3 sm:py-4 bg-slate-800 text-white rounded-2xl hover:bg-slate-700 transition-colors">
+                    <i class="fa-solid fa-list"></i> 物理一覧
+                </a>
+            </div>
+            <p class="text-[10px] sm:text-[11px] text-slate-400">Copyright &copy; 2021-2026 T.Suzuki</p>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('simCanvas');
+        const ctx = canvas.getContext('2d');
+        const graphCanvas = document.getElementById('graphCanvas');
+        const gCtx = graphCanvas.getContext('2d');
+
+        // Physics parameters (actual real-world scale model)
+        let v0 = 20.0;    // m/s
+        const g = 9.8;    // m/s^2 (Fixed to 9.8 as requested)
+        const h0 = 0.0;   // m (Initial height fixed to 0.0m)
+        let PIXELS_PER_METER = 5; // Dynamic scaling coefficient
+        
+        let time = 0.0;
+        let isPlaying = false;
+        let playSpeed = 1.0;
+        let activeGraph = 'y-t';
+        let lastTimestamp = 0;
+        let maxSimTime = 10.0; // Seconds (Fixed to 10s)
+
+        // Calculate auto scale factor so objects never go off-screen at 10.0s
+        function getDynamicPixelsPerMeter() {
+            const cWidth = canvas.width || 800;
+            const cHeight = canvas.height || 400;
+
+            // Find absolute maximum limits of the movement over 10s:
+            const maxDisplacementY = v0 * 10.0 + 0.5 * g * 100.0;
+            const maxDisplacementX = v0 * 10.0;
+
+            // Canvas available safe boundaries
+            const safeHeight = cHeight * 0.85;
+            const safeWidth = cWidth * 0.42;
+
+            // Determine limiting scale factor
+            const scaleY = safeHeight / (h0 + maxDisplacementY);
+            const scaleX = safeWidth / maxDisplacementX;
+
+            const computedScale = Math.min(scaleY, scaleX);
+            if (!isFinite(computedScale) || computedScale <= 0) {
+                return 3.0; // Safe default scale
+            }
+
+            return Math.min(computedScale, 5.0);
+        }
+
+        // Canvas element resizing listener to handle fluid responsiveness
+        function resizeCanvases() {
+            const simParent = canvas.parentElement;
+            canvas.width = simParent.clientWidth || 800;
+            canvas.height = simParent.clientHeight || 400;
+
+            const graphParent = graphCanvas.parentElement;
+            graphCanvas.width = graphParent.clientWidth || 800;
+            graphCanvas.height = graphParent.clientHeight || 180;
+            
+            PIXELS_PER_METER = getDynamicPixelsPerMeter();
+            draw();
+        }
+
+        window.addEventListener('resize', resizeCanvases);
+
+        // UI components
+        const btnPlay = document.getElementById('btnPlay');
+        const playIcon = document.getElementById('playIcon');
+        const playText = document.getElementById('playText');
+        const btnReset = document.getElementById('btnReset');
+        const btnPrevFrame = document.getElementById('btnPrevFrame');
+        const btnNextFrame = document.getElementById('btnNextFrame');
+        const timeSeeker = document.getElementById('timeSeeker');
+        const timeDisplay = document.getElementById('timeDisplay');
+        const maxTimeDisplay = document.getElementById('maxTimeDisplay');
+
+        // Parameter inputs
+        const paramV0 = document.getElementById('paramV0');
+        const valV0 = document.getElementById('valV0');
+
+        const showVectors = document.getElementById('showVectors');
+        const showStrobe = document.getElementById('showStrobe');
+        const showCircle = document.getElementById('showCircle');
+        const showLabels = document.getElementById('showLabels'); // New Label Checkbox
+
+        // Target visibility checks
+        const chkUp = document.getElementById('chk_up');
+        const chkDown = document.getElementById('chk_down');
+        const chkRight = document.getElementById('chk_right');
+        const chkLeft = document.getElementById('chk_left');
+
+        // Analytical equations of motions to support frame scrubbing accurately
+        function calculateState(id, t) {
+            PIXELS_PER_METER = getDynamicPixelsPerMeter();
+            const startY = 40; // Pin start position high up near the top of the canvas
+            
+            // X positioning (Always starting from the exact same position)
+            const cWidth = canvas.width || 800;
+            const startX = cWidth / 2;
+
+            let x = startX;
+            let y = startY;
+            let vx = 0;
+            let vy = 0;
+            let landed = false;
+            let t_land = Infinity;
+            let evalT = t;
+
+            // Calculation based on selected motion profile
+            if (id === 'up') {
+                y = startY - (v0 * evalT - 0.5 * g * evalT * evalT) * PIXELS_PER_METER;
+                vy = -(v0 - g * evalT);
+                vx = 0;
+                x = startX;
+            } else if (id === 'down') {
+                y = startY + (v0 * evalT + 0.5 * g * evalT * evalT) * PIXELS_PER_METER;
+                vy = v0 + g * evalT;
+                vx = 0;
+                x = startX;
+            } else if (id === 'right') {
+                x = startX + (v0 * evalT) * PIXELS_PER_METER;
+                y = startY + (0.5 * g * evalT * evalT) * PIXELS_PER_METER;
+                vx = v0;
+                vy = g * evalT;
+            } else if (id === 'left') {
+                x = startX - (v0 * evalT) * PIXELS_PER_METER;
+                y = startY + (0.5 * g * evalT * evalT) * PIXELS_PER_METER;
+                vx = -v0;
+                vy = g * evalT;
+            }
+
+            return { x, y, vx, vy, t_land, landed, physicalX: (x - startX) / PIXELS_PER_METER, physicalY: (y - startY) / PIXELS_PER_METER };
+        }
+
+        // Check time boundaries and adjust Play Button UI if finished (at 10s)
+        function checkTimeBoundaries() {
+            if (time >= maxSimTime) {
+                time = maxSimTime;
+                isPlaying = false;
+                btnPlay.disabled = true;
+                btnPlay.classList.add('opacity-50', 'cursor-not-allowed');
+                playIcon.className = "fa-solid fa-ban";
+                playText.textContent = "終了";
+            } else {
+                btnPlay.disabled = false;
+                btnPlay.classList.remove('opacity-50', 'cursor-not-allowed');
+                if (isPlaying) {
+                    playIcon.className = "fa-solid fa-pause";
+                    playText.textContent = "一時停止";
+                } else {
+                    playIcon.className = "fa-solid fa-play";
+                    playText.textContent = "再生";
+                }
+            }
+        }
+
+        // Parameter updates
+        function updateParameters() {
+            v0 = parseFloat(paramV0.value);
+            valV0.textContent = v0.toFixed(1) + " m/s";
+
+            maxSimTime = 10.0; 
+            timeSeeker.max = maxSimTime.toFixed(2);
+            maxTimeDisplay.textContent = `Max: ${maxSimTime.toFixed(1)}s`;
+
+            PIXELS_PER_METER = getDynamicPixelsPerMeter();
+            draw();
+        }
+
+        paramV0.addEventListener('input', updateParameters);
+        [showVectors, showStrobe, showCircle, showLabels, chkUp, chkDown, chkRight, chkLeft].forEach(el => el.addEventListener('change', draw));
+
+        // Time scrubbing
+        timeSeeker.addEventListener('input', () => {
+            time = parseFloat(timeSeeker.value);
+            timeDisplay.textContent = time.toFixed(2);
+            checkTimeBoundaries();
+            draw();
+        });
+
+        // Play/Pause State Management
+        btnPlay.addEventListener('click', () => {
+            if (time >= maxSimTime) return; // Prevent playing if already at end
+            isPlaying = !isPlaying;
+            checkTimeBoundaries();
+            if (isPlaying) {
+                lastTimestamp = performance.now();
+                requestAnimationFrame(animationLoop);
+            }
+        });
+
+        btnReset.addEventListener('click', () => {
+            isPlaying = false;
+            time = 0.0;
+            timeSeeker.value = 0;
+            timeDisplay.textContent = "0.00";
+            checkTimeBoundaries();
+            draw();
+        });
+
+        btnPrevFrame.addEventListener('click', () => {
+            isPlaying = false;
+            time = Math.max(0, time - 0.05);
+            timeSeeker.value = time;
+            timeDisplay.textContent = time.toFixed(2);
+            checkTimeBoundaries();
+            draw();
+        });
+
+        btnNextFrame.addEventListener('click', () => {
+            isPlaying = false;
+            time = Math.min(maxSimTime, time + 0.05);
+            timeSeeker.value = time;
+            timeDisplay.textContent = time.toFixed(2);
+            checkTimeBoundaries();
+            draw();
+        });
+
+        // Speed selectors
+        document.querySelectorAll('.speed-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                document.querySelectorAll('.speed-btn').forEach(b => {
+                    b.classList.remove('bg-slate-800', 'text-blue-400', 'font-bold');
+                    b.classList.add('text-slate-400');
+                });
+                btn.classList.add('bg-slate-800', 'text-blue-400', 'font-bold');
+                btn.classList.remove('text-slate-400');
+                playSpeed = parseFloat(btn.dataset.speed);
+            });
+        });
+
+        // Graph Selection Tab Management
+        document.querySelectorAll('.graph-tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                document.querySelectorAll('.graph-tab').forEach(t => {
+                    t.classList.remove('bg-slate-800', 'text-blue-400');
+                    t.classList.add('text-slate-400');
+                });
+                tab.classList.add('bg-slate-800', 'text-blue-400');
+                tab.classList.remove('text-slate-400');
+                activeGraph = tab.dataset.graph;
+                draw();
+            });
+        });
+
+        // Main animation state ticker
+        function animationLoop(timestamp) {
+            if (!isPlaying) return;
+            const dt = (timestamp - lastTimestamp) / 1000.0;
+            lastTimestamp = timestamp;
+
+            time += dt * playSpeed;
+            if (time > maxSimTime) {
+                time = maxSimTime;
+                isPlaying = false;
+            }
+
+            timeSeeker.value = time;
+            timeDisplay.textContent = time.toFixed(2);
+            checkTimeBoundaries();
+            draw();
+
+            if (isPlaying) {
+                requestAnimationFrame(animationLoop);
+            }
+        }
+
+        // Vector Arrow Drawing Helper
+        function drawArrow(ctx, fromX, fromY, toX, toY, color, width = 2) {
+            const headLength = 10;
+            const dx = toX - fromX;
+            const dy = toY - fromY;
+            const angle = Math.atan2(dy, dx);
+            
+            // Draw shaft
+            ctx.strokeStyle = color;
+            ctx.lineWidth = width;
+            ctx.beginPath();
+            ctx.moveTo(fromX, fromY);
+            ctx.lineTo(toX, toY);
+            ctx.stroke();
+            
+            // Draw arrowhead
+            ctx.fillStyle = color;
+            ctx.beginPath();
+            ctx.moveTo(toX, toY);
+            ctx.lineTo(toX - headLength * Math.cos(angle - Math.PI / 6), toY - headLength * Math.sin(angle - Math.PI / 6));
+            ctx.lineTo(toX - headLength * Math.cos(angle + Math.PI / 6), toY - headLength * Math.sin(angle + Math.PI / 6));
+            ctx.fill();
+        }
+
+        function draw() {
+            if (!canvas.width || !canvas.height) {
+                return; 
+            }
+
+            // Clear screens
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            PIXELS_PER_METER = getDynamicPixelsPerMeter();
+            
+            // Grid and Environment Drawing
+            const startY = 40;
+            const gridInterval = 25;
+
+            // Draw Fine Background Grid
+            ctx.strokeStyle = '#1e293b';
+            ctx.lineWidth = 0.5;
+            for (let x = 0; x < canvas.width; x += gridInterval) {
+                ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, canvas.height); ctx.stroke();
+            }
+            for (let y = 0; y < canvas.height; y += gridInterval) {
+                ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(canvas.width, y); ctx.stroke();
+            }
+
+            // Draw Height labels on left axis relative to start position (Mabara labels: 50m intervals)
+            ctx.fillStyle = '#64748b';
+            ctx.font = '10px monospace';
+            ctx.textAlign = 'right';
+            const heightStepMeters = 50; // まばらな目盛り単位に変更
+            const heightStepPx = heightStepMeters * PIXELS_PER_METER;
+            for (let y = startY, h = 0; y < canvas.height; y += heightStepPx, h += heightStepMeters) {
+                ctx.fillText(`-${h}m`, 40, y + 4);
+                ctx.strokeStyle = '#334155';
+                ctx.lineWidth = 1;
+                ctx.beginPath(); ctx.moveTo(43, y); ctx.lineTo(50, y); ctx.stroke();
+            }
+            for (let y = startY - heightStepPx, h = heightStepMeters; y > 0; y -= heightStepPx, h += heightStepMeters) {
+                ctx.fillText(`+${h}m`, 40, y + 4);
+                ctx.strokeStyle = '#334155';
+                ctx.lineWidth = 1;
+                ctx.beginPath(); ctx.moveTo(43, y); ctx.lineTo(50, y); ctx.stroke();
+            }
+
+            // Draw Initial Height line marking point of release
+            ctx.strokeStyle = 'rgba(71, 85, 105, 0.6)';
+            ctx.lineWidth = 1;
+            ctx.setLineDash([6, 4]);
+            ctx.beginPath(); ctx.moveTo(0, startY); ctx.lineTo(canvas.width, startY); ctx.stroke();
+            ctx.setLineDash([]); // Reset
+
+            // Objects details configuration
+            const configs = [
+                { id: 'up', color: '#facc15', checkbox: chkUp },
+                { id: 'down', color: '#f87171', checkbox: chkDown },
+                { id: 'right', color: '#4ade80', checkbox: chkRight },
+                { id: 'left', color: '#22d3ee', checkbox: chkLeft }
+            ];
+
+            // Render Dynamic Circle and Center connecting the 4 moving balls (Pure White)
+            if (showCircle.checked) {
+                const centerX = canvas.width / 2;
+                const centerY = startY + (0.5 * g * time * time) * PIXELS_PER_METER;
+                const radius = (v0 * time) * PIXELS_PER_METER;
+
+                if (time > 0.05) {
+                    // Draw outer dashed matching circle (Pure White for high visibility)
+                    ctx.strokeStyle = 'rgba(255, 255, 255, 0.85)';
+                    ctx.lineWidth = 2;
+                    ctx.setLineDash([5, 5]);
+                    ctx.beginPath();
+                    ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
+                    ctx.stroke();
+                    ctx.setLineDash([]);
+
+                    // Draw cross-connecting lines through center to active elements
+                    ctx.strokeStyle = 'rgba(255, 255, 255, 0.25)';
+                    ctx.lineWidth = 1;
+                    configs.forEach(cfg => {
+                        if (cfg.checkbox.checked) {
+                            const state = calculateState(cfg.id, time);
+                            ctx.beginPath();
+                            ctx.moveTo(centerX, centerY);
+                            ctx.lineTo(state.x, state.y);
+                            ctx.stroke();
+                        }
+                    });
+
+                    // Draw Center dot (High visibility White)
+                    ctx.fillStyle = '#ffffff';
+                    ctx.shadowColor = '#ffffff';
+                    ctx.shadowBlur = 8;
+                    ctx.beginPath();
+                    ctx.arc(centerX, centerY, 5, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.shadowBlur = 0;
+
+                    // Label the Center Point (Only if showLabels is checked)
+                    if (showLabels.checked) {
+                        ctx.fillStyle = '#ffffff';
+                        ctx.font = '9px sans-serif';
+                        ctx.textAlign = 'left';
+                        ctx.fillText(`運動中心 (自由落下位置)`, centerX + 8, centerY + 3);
+                    }
+                }
+            }
+
+            configs.forEach(cfg => {
+                if (!cfg.checkbox.checked) return;
+
+                // 1. Draw Trace Line (Finer single-pixel solid line)
+                if (showStrobe.checked) {
+                    ctx.strokeStyle = cfg.color;
+                    ctx.lineWidth = 1; 
+                    ctx.beginPath();
+                    for (let t_strobe = 0; t_strobe <= time; t_strobe += 0.05) {
+                        const s_state = calculateState(cfg.id, t_strobe);
+                        if (t_strobe === 0) {
+                            ctx.moveTo(s_state.x, s_state.y);
+                        } else {
+                            ctx.lineTo(s_state.x, s_state.y);
+                        }
+                    }
+                    ctx.stroke();
+                }
+
+                // Calculate present positional values
+                const state = calculateState(cfg.id, time);
+
+                // 2. Draw Combined Speed vector
+                if (showVectors.checked) {
+                    const scaleVec = 1.5;
+                    const endX = state.x + (state.vx * scaleVec);
+                    const endY = state.y + (state.vy * scaleVec);
+                    drawArrow(ctx, state.x, state.y, endX, endY, '#f1f5f9', 2);
+                }
+
+                // 3. Draw Main Ball Circle
+                ctx.fillStyle = cfg.color;
+                ctx.shadowColor = cfg.color;
+                ctx.shadowBlur = 8;
+                ctx.beginPath();
+                ctx.arc(state.x, state.y, 7, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.shadowBlur = 0;
+
+                // Label tagging (Only if showLabels is checked)
+                if (showLabels.checked) {
+                    ctx.fillStyle = '#f1f5f9';
+                    ctx.font = '10px sans-serif';
+                    ctx.textAlign = 'center';
+                    let label = '';
+                    if (cfg.id === 'up') label = '投げ上げ';
+                    if (cfg.id === 'down') label = '投げ下ろし';
+                    if (cfg.id === 'right') label = '水平(右)';
+                    if (cfg.id === 'left') label = '水平(左)';
+                    ctx.fillText(label, state.x, state.y - 12);
+                }
+            });
+
+            drawGraph();
+        }
+
+        function drawGraph() {
+            if (!graphCanvas.width || !graphCanvas.height) return;
+
+            gCtx.clearRect(0, 0, graphCanvas.width, graphCanvas.height);
+
+            // Left margin widened to 55 to prevent axis labels overlapping
+            const margin = { top: 15, right: 20, bottom: 25, left: 55 };
+            const width = graphCanvas.width - margin.left - margin.right;
+            const height = graphCanvas.height - margin.top - margin.bottom;
+
+            // Graph background grid
+            gCtx.fillStyle = '#020617';
+            gCtx.fillRect(margin.left, margin.top, width, height);
+
+            // Set Min/Max limits of vertical values depending on tab selected
+            let yMin = 0, yMax = 50;
+            let yAxisLabel = "高さ y[m]"; // Label default changed
+
+            if (activeGraph === 'y-t') {
+                const maxDrop = -(v0 * 10.0 + 0.5 * g * 100.0);
+                yMin = Math.floor(maxDrop / 50.0) * 50.0;
+                const maxH = (v0 * v0) / (2 * g);
+                yMax = Math.ceil(maxH / 10.0) * 10.0 + 10.0;
+                yAxisLabel = "高さ y[m]"; // Label strictly fixed to 高さ y[m]
+            } else if (activeGraph === 'vy-t') {
+                const minVy = -(v0 + g * 10.0);
+                yMin = Math.floor(minVy / 10.0) * 10.0;
+                yMax = Math.ceil(v0 / 10.0) * 10.0;
+                yAxisLabel = "鉛直速度 vy [m/s]";
+            }
+
+            // Draw ticks & axis grid
+            gCtx.strokeStyle = '#1e293b';
+            gCtx.lineWidth = 0.5;
+            gCtx.font = '10px monospace'; // Large and more readable monospace font
+            gCtx.fillStyle = '#e2e8f0'; // High contrast off-white colors
+            gCtx.textAlign = 'right';
+
+            // Horizontal lines (Ticks)
+            const tickCount = 5;
+            for (let i = 0; i <= tickCount; i++) {
+                const physicalVal = yMin + ((yMax - yMin) / tickCount) * i;
+                const plotY = margin.top + height - (i / tickCount) * height;
+                
+                gCtx.beginPath();
+                gCtx.moveTo(margin.left, plotY);
+                gCtx.lineTo(margin.left + width, plotY);
+                gCtx.stroke();
+
+                gCtx.fillText(physicalVal.toFixed(0), margin.left - 5, plotY + 3);
+            }
+
+            // Vertical time grid lines (2s intervals)
+            gCtx.textAlign = 'center';
+            for (let t_sec = 0; t_sec <= maxSimTime; t_sec += 2.0) { 
+                const plotX = margin.left + (t_sec / maxSimTime) * width;
+                gCtx.beginPath();
+                gCtx.moveTo(plotX, margin.top);
+                gCtx.lineTo(plotX, margin.top + height);
+                gCtx.stroke();
+
+                gCtx.fillText(`${t_sec.toFixed(0)}s`, plotX, margin.top + height + 12);
+            }
+
+            // Draw central zero-line if values span positive & negative regions
+            if (yMin < 0 && yMax > 0) {
+                const zeroRatio = (0 - yMin) / (yMax - yMin);
+                const zeroY = margin.top + height - zeroRatio * height;
+                gCtx.strokeStyle = '#475569';
+                gCtx.lineWidth = 1;
+                gCtx.beginPath();
+                gCtx.moveTo(margin.left, zeroY);
+                gCtx.lineTo(margin.left + width, zeroY);
+                gCtx.stroke();
+            }
+
+            // Draw axis borders
+            gCtx.strokeStyle = '#334155';
+            gCtx.lineWidth = 1.5;
+            gCtx.beginPath();
+            gCtx.moveTo(margin.left, margin.top);
+            gCtx.lineTo(margin.left, margin.top + height);
+            gCtx.lineTo(margin.left + width, margin.top + height);
+            gCtx.stroke();
+
+            // Label axes titles
+            gCtx.save();
+            gCtx.translate(14, margin.top + height / 2);
+            gCtx.rotate(-Math.PI / 2);
+            gCtx.fillStyle = '#e2e8f0'; // Brighter labels
+            gCtx.font = '10px sans-serif'; // Upgraded font sizes
+            gCtx.textAlign = 'center';
+            gCtx.fillText(yAxisLabel, 0, 0);
+            gCtx.restore();
+
+            const configs = [
+                { id: 'up', color: '#facc15', checkbox: chkUp },
+                { id: 'down', color: '#f87171', checkbox: chkDown },
+                { id: 'right', color: '#4ade80', checkbox: chkRight },
+                { id: 'left', color: '#22d3ee', checkbox: chkLeft }
+            ];
+
+            configs.forEach(cfg => {
+                if (!cfg.checkbox.checked) return;
+
+                gCtx.strokeStyle = cfg.color;
+                gCtx.lineWidth = 2;
+                gCtx.beginPath();
+
+                const step = 0.02;
+                let started = false;
+
+                // Plot values up to the present timeline pointer
+                for (let t_plot = 0; t_plot <= time; t_plot += step) {
+                    const plotX = margin.left + (t_plot / maxSimTime) * width;
+                    const state = calculateState(cfg.id, t_plot);
+                    
+                    let targetVal = 0;
+                    if (activeGraph === 'y-t') targetVal = -state.physicalY;
+                    else if (activeGraph === 'vy-t') targetVal = -state.vy;
+
+                    const yRatio = (targetVal - yMin) / (yMax - yMin);
+                    const plotY = margin.top + height - yRatio * height;
+
+                    if (!started) {
+                        gCtx.moveTo(plotX, plotY);
+                        started = true;
+                    } else {
+                        if (plotY >= margin.top && plotY <= margin.top + height) {
+                            gCtx.lineTo(plotX, plotY);
+                        }
+                    }
+                }
+                gCtx.stroke();
+
+                // Draw end point marker circle
+                const stateAtT = calculateState(cfg.id, time);
+                let currentVal = 0;
+                if (activeGraph === 'y-t') currentVal = -stateAtT.physicalY;
+                else if (activeGraph === 'vy-t') currentVal = -stateAtT.vy;
+
+                const yRatioAtT = (currentVal - yMin) / (yMax - yMin);
+                const plotYAtT = margin.top + height - yRatioAtT * height;
+                const plotXAtT = margin.left + (time / maxSimTime) * width;
+
+                if (plotYAtT >= margin.top && plotYAtT <= margin.top + height) {
+                    gCtx.fillStyle = cfg.color;
+                    gCtx.beginPath();
+                    gCtx.arc(plotXAtT, plotYAtT, 4.5, 0, Math.PI * 2);
+                    gCtx.fill();
+                }
+            });
+
+            // Draw Time-slider synchronous vertical line
+            const timeLineX = margin.left + (time / maxSimTime) * width;
+            gCtx.strokeStyle = 'rgba(239, 68, 68, 0.5)';
+            gCtx.lineWidth = 1.5;
+            gCtx.setLineDash([4, 2]);
+            gCtx.beginPath();
+            gCtx.moveTo(timeLineX, margin.top);
+            gCtx.lineTo(timeLineX, margin.top + height);
+            gCtx.stroke();
+            gCtx.setLineDash([]);
+        }
+
+        // Initialize state on page load
+        window.addEventListener('load', () => {
+            setTimeout(() => {
+                resizeCanvases();
+                updateParameters();
+            }, 100);
+        });
+    </script>
+</body>
+</html>

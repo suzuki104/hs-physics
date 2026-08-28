@@ -1,0 +1,742 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>重力と位置エネルギー|高校物理アニメーション教材</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- MathJax による LaTeX 数式のレンダリング -->
+    <script>
+        window.MathJax = {
+            tex: {
+                inlineMath: [['$', '$'], ['\\(', '\\)']],
+                displayMath: [['$$', '$$'], ['\\[', '\\]']]
+            }
+        };
+    </script>
+    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <style>
+        body {
+            background-color: #f8fafc;
+        }
+        #canvas-container {
+            position: relative;
+            width: 100%;
+            height: 70vh;
+            background: linear-gradient(to bottom, #e2e8f0 0%, #ffffff 100%);
+            border-bottom: 4px solid #475569;
+            cursor: default;
+            touch-action: pan-y; /* pan-yに変更し、不要な時はページスクロールを許容する */
+        }
+        #canvas-container:active {
+            cursor: grabbing;
+        }
+        .label {
+            pointer-events: none;
+            user-select: none;
+        }
+    </style>
+</head>
+<body class="p-4 md:p-8">
+    <div class="max-w-4xl mx-auto bg-white rounded-xl shadow-2xl overflow-hidden">
+        <div class="p-6 border-b border-gray-100 text-center">
+            <h1 class="text-2xl font-bold text-gray-800">重力と位置エネルギー</h1>
+            <p class="text-gray-600 mt-2">物体をドラッグして動かし、位置エネルギーの変化と重力がした仕事の関係を観察しましょう。物体を動かす前に高さの点線をドラッグすると、はじめの位置を変えられます。</p>
+        </div>
+
+        <div id="canvas-container" class="relative">
+            <canvas id="simCanvas"></canvas>
+            
+            <!-- 設定パネル -->
+            <div class="absolute bottom-4 right-4 flex gap-2">
+                <button id="resetBtn" class="px-4 py-2 bg-gray-800 text-white rounded-lg hover:bg-gray-700 transition shadow-lg">
+                    リセット
+                </button>
+            </div>
+        </div>
+
+        <!-- 「Uはじめ - W重力 = Uあと」の関係式をアニメーションと数値の間に配置 -->
+        <div class="bg-indigo-50/80 px-6 py-4 border-b border-indigo-100 flex justify-center items-center">
+            <div class="text-center">
+                <!-- 物理記号式 -->
+                <div class="text-xl md:text-2xl font-bold text-indigo-900 font-mono">
+                    $$U_{\text{はじめ}} - W_{\text{重力}} = U_{\text{あと}}$$
+                </div>
+                <!-- リアルタイム数値式 -->
+                <div class="text-lg md:text-xl font-bold text-indigo-700 font-mono mt-2" id="displayFormulaValue">
+                    0.00 - 0.00 = 0.00 J
+                </div>
+                <div class="text-xs text-indigo-600 font-semibold mt-1">
+                    （はじめの位置エネルギー） $-$ （重力がした仕事） $=$ （あとの位置エネルギー）
+                </div>
+            </div>
+        </div>
+
+        <!-- 解説・シミュレーション値エリア -->
+        <div class="p-6 bg-gray-50 space-y-6">
+
+            <!-- シミュレーション値をキャンバス外の下に配置 -->
+            <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-100">
+                <div class="grid grid-cols-2 md:grid-cols-5 gap-4">
+                    <!-- 1列目：はじめの位置エネルギー、あとの位置エネルギー、重力がした仕事 -->
+                    <div class="flex flex-col p-2 bg-slate-50 rounded-lg">
+                        <span class="text-xs text-gray-500">はじめの位置エネルギー<br>($U_{\text{はじめ}} = mgh_{\text{はじめ}}$):</span>
+                        <span id="displayInitPE" class="text-lg font-mono font-bold text-indigo-600">0.00 J</span>
+                    </div>
+                    <div class="flex flex-col p-2 bg-slate-50 rounded-lg">
+                        <span class="text-xs text-gray-500">あとの位置エネルギー<br>($U_{\text{あと}} = mgh$):</span>
+                        <span id="displayPE" class="text-lg font-mono font-bold text-purple-600">0.00 J</span>
+                    </div>
+                    <div class="flex flex-col p-2 bg-slate-50 rounded-lg">
+                        <span class="text-xs text-gray-500">重力がした仕事<br>($W_{\text{重力}}$):</span>
+                        <span id="displayGravityWork" class="text-lg font-mono font-bold text-orange-600">0.00 J</span>
+                    </div>
+                    <!-- 2列目：現在の高さと物体の質量 -->
+                    <div class="flex flex-col p-2 bg-slate-50 rounded-lg">
+                        <span class="text-xs text-gray-500">現在の高さ<br>($h$):</span>
+                        <span id="displayHeight" class="text-lg font-mono font-bold text-blue-600">0.00 m</span>
+                    </div>
+                    <div class="flex flex-col p-2 bg-slate-50 rounded-lg">
+                        <span class="text-xs text-gray-500">物体の質量<br>($m$):</span>
+                        <span class="text-lg font-mono font-bold text-gray-700">2.00 kg</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ※の説明をアニメーション（キャンバス）のすぐ下に配置 -->
+            <p class="text-xs text-gray-500 italic text-right">
+                ※ 位置エネルギーの基準面（$h = 0$）を床としています。
+            </p>
+
+            <!-- 物理のポイント -->
+            <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-100">
+                <p class="text-sm text-gray-600 leading-relaxed">
+                    物体が下方に移動するとき、重力は移動方向と同じ向きに働くため<strong>正（プラス）の仕事</strong>をします。逆に上方に移動するときは、重力と逆向きに移動するため<strong>負（マイナス）の仕事</strong>をします。重力がした仕事 $W_{\text{重力}}$ は、位置エネルギーの変化量 $\Delta U$ を用いて $W_{\text{重力}} = -\Delta U = U_{\text{はじめ}} - U_{\text{あと}}$ と表されます。
+                </p>
+            </div>
+        </div>
+
+        <!-- ナビゲーション・コピーライト -->
+        <div class="p-6 bg-white border-t border-gray-100">
+            <div class="flex flex-col items-center gap-6 sm:gap-8 pt-6 sm:pt-8 border-t border-slate-100">
+                <div class="flex gap-4 sm:gap-6 text-sm font-bold">
+                    <a href="../6.0_home/home.html" class="flex items-center gap-2 px-6 sm:px-8 py-3 sm:py-4 bg-slate-800 text-white rounded-2xl hover:bg-slate-700 transition-colors">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path>
+                        </svg>
+                        ホーム
+                    </a>
+                    <a href="../6.1_physics_home/physics_home.html" class="flex items-center gap-2 px-6 sm:px-8 py-3 sm:py-4 bg-slate-800 text-white rounded-2xl hover:bg-slate-700 transition-colors">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M4 6h16M4 12h16M4 18h16"></path>
+                        </svg>
+                        物理一覧
+                    </a>
+                </div>
+                <p class="text-[10px] sm:text-[11px] text-slate-400">Copyright &copy; 2021-<span id="currentYear"></span> T.Suzuki</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('simCanvas');
+        const ctx = canvas.getContext('2d');
+        const container = document.getElementById('canvas-container');
+        
+        // UI elements
+        const displayHeight = document.getElementById('displayHeight');
+        const displayInitPE = document.getElementById('displayInitPE');
+        const displayPE = document.getElementById('displayPE');
+        const displayGravityWork = document.getElementById('displayGravityWork');
+        const displayFormulaValue = document.getElementById('displayFormulaValue');
+        const resetBtn = document.getElementById('resetBtn');
+
+        // 物理定数・設定
+        const g = 9.8; // 重力加速度
+        const mass = 2.0; // 質量 (kg)
+        const pxPerMeter = 100; // 1メートルあたりのピクセル
+        const size = 60; // 物体のサイズ (px)
+        
+        // 状態変数
+        let objX, objY, groundY;
+        let initObjX, initObjY; // 初期位置（高い位置）の保存用
+        let isDraggingObj = false; // 物体をドラッグ中か
+        let isDraggingInitLine = false; // はじめの高さ点線をドラッグ中か
+        let dragOffsetX = 0; // ドラッグ開始時のオフセット
+        let dragOffsetY = 0;
+
+        // 論理上のキャンバスサイズ（DPR対応用論理座標）
+        let viewWidth = 800;
+        let viewHeight = 500;
+
+        function init(isFirstLoad = false) {
+            resize();
+            groundY = viewHeight - 120; // 床の位置
+            
+            if (isFirstLoad) {
+                // 初回読み込み時のみ物体を上空高い位置（3.0m）に設定
+                // スマホ縦画面時は重なり防止のため、デフォルトの位置を少し左(42%)に設定する
+                const isMobile = viewWidth < 640;
+                initObjX = isMobile ? viewWidth * 0.42 : viewWidth / 2; 
+                initObjY = groundY - 300; 
+                objX = initObjX;
+                objY = groundY - 300;
+            } else {
+                // リセット時は現在の「はじめの位置（initObjY）」を維持して物体をそこに戻す
+                objX = initObjX;
+                objY = initObjY;
+            }
+            isDraggingObj = false;
+            isDraggingInitLine = false;
+
+            updateUI();
+            
+            // コピーライトの年度を自動更新
+            document.getElementById('currentYear').innerText = new Date().getFullYear();
+        }
+
+        function resize() {
+            const dpr = window.devicePixelRatio || 1;
+            viewWidth = container.clientWidth || 800;
+            viewHeight = container.clientHeight || 500;
+            
+            // 描画バッファサイズの設定
+            canvas.width = viewWidth * dpr;
+            canvas.height = viewHeight * dpr;
+            
+            // CSS表示サイズの設定
+            canvas.style.width = viewWidth + 'px';
+            canvas.style.height = viewHeight + 'px';
+            
+            ctx.resetTransform();
+            ctx.scale(dpr, dpr);
+            
+            const oldGroundY = groundY;
+            groundY = viewHeight - 120;
+            
+            // スマホ縦画面時はデフォルトの位置を少し左(42%)に設定する
+            const isMobile = viewWidth < 640;
+            initObjX = isMobile ? viewWidth * 0.42 : viewWidth / 2;
+            
+            // リサイズ時に、はじめの高さ（床からのピクセル高）を維持する
+            if (initObjY !== undefined && oldGroundY !== undefined) {
+                const hOffset = oldGroundY - initObjY;
+                initObjY = groundY - hOffset;
+            } else {
+                initObjY = groundY - 300;
+            }
+
+            // 初期位置のままリサイズされた場合は位置を同期させる
+            if (!isDraggingObj && !isDraggingInitLine) {
+                objX = initObjX;
+                if (objY !== undefined && oldGroundY !== undefined) {
+                    const objHOffset = oldGroundY - objY;
+                    objY = groundY - objHOffset;
+                } else {
+                    objY = initObjY;
+                }
+            }
+            
+            // 物体が画面外に行かないように調整
+            if (objY > groundY) objY = groundY;
+            const minX = isMobile ? 130 : size/2; // 左側の表示スペース確保のためスマホ時の制限を調整
+            objX = Math.max(minX, Math.min(viewWidth - size/2, objX));
+        }
+
+        window.addEventListener('resize', resize);
+
+        // 物体のホバー判定
+        function isHoveringObject(x, y) {
+            return x >= objX - size/2 && x <= objX + size/2 &&
+                   y >= objY - size && y <= objY;
+        }
+
+        // マウスイベントリスナー
+        container.addEventListener('mousedown', (e) => {
+            const rect = canvas.getBoundingClientRect();
+            const mouseX = e.clientX - rect.left;
+            const mouseY = e.clientY - rect.top;
+
+            const isOverInitLine = Math.abs(mouseY - initObjY) < 10;
+            const isInitialState = Math.abs(objY - initObjY) < 1.0;
+
+            if (isInitialState && isOverInitLine) {
+                isDraggingInitLine = true;
+                dragOffsetY = mouseY - initObjY;
+            } else if (isHoveringObject(mouseX, mouseY)) {
+                isDraggingObj = true;
+                dragOffsetX = mouseX - objX;
+                dragOffsetY = mouseY - objY;
+            }
+        });
+
+        container.addEventListener('mousemove', (e) => {
+            const rect = canvas.getBoundingClientRect();
+            const mouseX = e.clientX - rect.left;
+            const mouseY = e.clientY - rect.top;
+
+            const isOverInitLine = Math.abs(mouseY - initObjY) < 10;
+            const isInitialState = Math.abs(objY - initObjY) < 1.0;
+
+            if (isDraggingInitLine) {
+                const newY = mouseY - dragOffsetY;
+                // 境界の制限 (床を突き抜けないようにし、天井からはみ出ないようにする)
+                initObjY = Math.min(groundY, Math.max(size, newY));
+                objY = initObjY; // はじめの位置と後の位置は同じ状態に保つ
+                updateUI();
+            } else if (isDraggingObj) {
+                objX = mouseX - dragOffsetX;
+                objY = mouseY - dragOffsetY;
+                
+                // 境界の制限 (床を突き抜けないようにし、天井や左右の壁からはみ出ないようにする)
+                const isMobile = viewWidth < 640;
+                const minX = isMobile ? 130 : size/2; // スマホ時は左側スペース確保のため左限を制限
+                objY = Math.min(groundY, Math.max(size, objY));
+                objX = Math.max(minX, Math.min(viewWidth - size/2, objX));
+                
+                updateUI();
+            }
+
+            // カーソル表示の切り替え
+            if (isDraggingInitLine) {
+                canvas.style.cursor = 'ns-resize';
+            } else if (isDraggingObj) {
+                canvas.style.cursor = 'grabbing';
+            } else if (isInitialState && isOverInitLine) {
+                canvas.style.cursor = 'ns-resize'; // 点線をドラッグ可能な状態
+            } else if (isHoveringObject(mouseX, mouseY)) {
+                canvas.style.cursor = 'grab';
+            } else {
+                canvas.style.cursor = 'default';
+            }
+        });
+
+        window.addEventListener('mouseup', () => {
+            isDraggingObj = false;
+            isDraggingInitLine = false;
+        });
+
+        // スマートフォン対応（タッチイベント）
+        container.addEventListener('touchstart', (e) => {
+            const touch = e.touches[0];
+            const rect = canvas.getBoundingClientRect();
+            const mouseX = touch.clientX - rect.left;
+            const mouseY = touch.clientY - rect.top;
+
+            const isOverInitLine = Math.abs(mouseY - initObjY) < 10;
+            const isInitialState = Math.abs(objY - initObjY) < 1.0;
+
+            if (isInitialState && isOverInitLine) {
+                isDraggingInitLine = true;
+                dragOffsetY = mouseY - initObjY;
+                e.preventDefault(); // ドラッグ対象をタッチした時のみページスクロールを抑止
+            } else if (isHoveringObject(mouseX, mouseY)) {
+                isDraggingObj = true;
+                dragOffsetX = mouseX - objX;
+                dragOffsetY = mouseY - objY;
+                e.preventDefault(); // ドラッグ対象をタッチした時のみページスクロールを抑止
+            }
+        }, { passive: false });
+
+        container.addEventListener('touchmove', (e) => {
+            if (!isDraggingObj && !isDraggingInitLine) return; // ドラッグしていなければ通常スクロールを許可
+            const touch = e.touches[0];
+            const rect = canvas.getBoundingClientRect();
+            const mouseX = touch.clientX - rect.left;
+            const mouseY = touch.clientY - rect.top;
+
+            if (isDraggingInitLine) {
+                const newY = mouseY - dragOffsetY;
+                initObjY = Math.min(groundY, Math.max(size, newY));
+                objY = initObjY;
+                updateUI();
+                e.preventDefault(); // ドラッグ中のみスクロールを防止
+            } else if (isDraggingObj) {
+                objX = mouseX - dragOffsetX;
+                objY = mouseY - dragOffsetY;
+                
+                const isMobile = viewWidth < 640;
+                const minX = isMobile ? 130 : size/2;
+                objY = Math.min(groundY, Math.max(size, objY));
+                objX = Math.max(minX, Math.min(viewWidth - size/2, objX));
+                
+                updateUI();
+                e.preventDefault(); // ドラッグ中のみスクロールを防止
+            }
+        }, { passive: false });
+
+        container.addEventListener('touchend', (e) => {
+            if (isDraggingObj || isDraggingInitLine) {
+                isDraggingObj = false;
+                isDraggingInitLine = false;
+                e.preventDefault();
+            }
+        }, { passive: false });
+
+        resetBtn.addEventListener('click', () => {
+            init(false);
+        });
+
+        function updateUI() {
+            const h = (groundY - objY) / pxPerMeter;
+            displayHeight.innerText = `${h.toFixed(2)} m`;
+
+            // はじめの位置エネルギーの計算 (U_はじめ = mgh_はじめ)
+            const hInit = (groundY - initObjY) / pxPerMeter;
+            const initPE = mass * g * hInit;
+            displayInitPE.innerText = `${initPE.toFixed(2)} J`;
+
+            // あとの位置エネルギーの計算 (U_あと = mgh)
+            const pe = mass * g * h;
+            displayPE.innerText = `${pe.toFixed(2)} J`;
+
+            // 重力がした仕事の計算 (W_重力 = mg * (h_はじめ - h))
+            // 初期高度 initObjY からの垂直変位に基づき重力のした仕事を求める
+            const gravityWork = mass * g * (hInit - h);
+            displayGravityWork.innerText = `${gravityWork.toFixed(2)} J`;
+
+            // 公式の数値式の更新
+            if (displayFormulaValue) {
+                // 重力が負 of 仕事をする（物体が上に移動する）ときは括弧で囲み、式を見やすく整える
+                const workStr = gravityWork < 0 ? `(${gravityWork.toFixed(2)})` : `${gravityWork.toFixed(2)}`;
+                displayFormulaValue.innerHTML = `${initPE.toFixed(2)} - ${workStr} = ${pe.toFixed(2)} <span class="text-sm font-semibold text-indigo-500">J</span>`;
+            }
+        }
+
+        function drawArrow(x, y, length, color, label, alignLeft = false) {
+            if (length === 0) return;
+            
+            ctx.save();
+            ctx.beginPath();
+            ctx.strokeStyle = color;
+            ctx.fillStyle = color;
+            ctx.lineWidth = 3;
+
+            const headlen = 10;
+            const endY = y + length;
+            
+            ctx.moveTo(x, y);
+            ctx.lineTo(x, endY);
+            ctx.stroke();
+
+            // 矢尻の描画
+            ctx.beginPath();
+            const angle = length > 0 ? Math.PI / 2 : -Math.PI / 2;
+            ctx.moveTo(x, endY);
+            ctx.lineTo(x - headlen * Math.cos(angle - Math.PI/6), endY - headlen * Math.sin(angle - Math.PI/6));
+            ctx.lineTo(x - headlen * Math.cos(angle + Math.PI/6), endY - headlen * Math.sin(angle + Math.PI/6));
+            ctx.fill();
+
+            // ベクトルラベル
+            ctx.font = "bold 14px sans-serif";
+            if (alignLeft) {
+                ctx.textAlign = "right";
+                ctx.fillText(label, x - 15, endY);
+            } else {
+                ctx.textAlign = "left";
+                ctx.fillText(label, x + 15, endY);
+            }
+            ctx.restore();
+        }
+
+        function draw() {
+            ctx.clearRect(0, 0, viewWidth, viewHeight);
+
+            // 床の描画
+            ctx.beginPath();
+            ctx.strokeStyle = "#475569";
+            ctx.lineWidth = 2;
+            ctx.moveTo(0, groundY + 2);
+            ctx.lineTo(viewWidth, groundY + 2);
+            ctx.stroke();
+
+            const isMobile = viewWidth < 640;
+
+            // 軸の矢印を描画（アニメーションの左側、下向き、始点の横棒は非表示）
+            // スマホ縦画面の時は重なりを防ぐためにさらに左に寄せる (15px)、通常は 35px
+            const axisX = isMobile ? 15 : 35;
+            const axisStartY = 60;
+            const axisEndY = groundY;
+            
+            ctx.save();
+            ctx.strokeStyle = "#475569";
+            ctx.fillStyle = "#475569";
+            ctx.lineWidth = 1.5;
+            
+            // 軸本体
+            ctx.beginPath();
+            ctx.moveTo(axisX, axisStartY);
+            ctx.lineTo(axisX, axisEndY);
+            ctx.stroke();
+            
+            // 終点（下端）の矢尻
+            const arrowHeadLen = 8;
+            ctx.beginPath();
+            ctx.moveTo(axisX, axisEndY);
+            ctx.lineTo(axisX - arrowHeadLen * 0.5, axisEndY - arrowHeadLen);
+            ctx.lineTo(axisX + arrowHeadLen * 0.5, axisEndY - arrowHeadLen);
+            ctx.fill();
+            
+            // 軸の変数ラベル
+            ctx.font = "italic bold 14px sans-serif";
+            ctx.fillText("y", axisX - 18, axisEndY - 5);
+            
+            // 補足「下向き正」
+            // スマホ時はテキストを矢印の左側（右揃え）に配置して、矢印右側のスペースを解放する
+            ctx.font = "10px sans-serif";
+            if (isMobile) {
+                ctx.textAlign = "right";
+                ctx.fillText("下向き正", axisX - 6, axisStartY + 15);
+            } else {
+                ctx.textAlign = "left";
+                ctx.fillText("下向き正", axisX + 8, axisStartY + 15);
+            }
+            ctx.restore();
+
+            // 初期位置（h_はじめ）の基準ラインとゴーストの描画
+            if (initObjX !== undefined && initObjY !== undefined) {
+                ctx.save();
+                ctx.strokeStyle = "rgba(79, 70, 229, 0.6)"; // より見やすい青系の色・太さに変更
+                ctx.lineWidth = 2;
+                ctx.setLineDash([4, 4]);
+                
+                // 水平点線（基準高さ）
+                ctx.beginPath();
+                ctx.moveTo(0, initObjY);
+                ctx.lineTo(viewWidth, initObjY);
+                ctx.stroke();
+
+                // 木箱のゴースト（初期位置の面影）
+                ctx.strokeStyle = "rgba(217, 119, 6, 0.25)";
+                ctx.strokeRect(initObjX - size/2, initObjY - size, size, size);
+                ctx.beginPath();
+                ctx.moveTo(initObjX - size/2, initObjY - size);
+                ctx.lineTo(initObjX + size/2, initObjY);
+                ctx.moveTo(initObjX + size/2, initObjY - size);
+                ctx.lineTo(initObjX - size/2, initObjY);
+                ctx.stroke();
+                
+                ctx.restore();
+
+                // はじめの位置エネルギー（U_はじめ）をキャンバス内に描画（「はじめ」を下付き文字のように表現）
+                ctx.save();
+                ctx.fillStyle = "#4f46e5"; // Indigo-600
+                ctx.font = "bold 13px sans-serif";
+                ctx.textAlign = "left"; // 左揃えにして計算のバグを修正
+                
+                const hInit = (groundY - initObjY) / pxPerMeter;
+                const initPE = mass * g * hInit;
+                const valueText = ` = ${initPE.toFixed(2)} J`;
+                
+                const labelMain = "はじめの位置エネルギー U";
+                const labelSub = "はじめ";
+                
+                ctx.font = "bold 9px sans-serif";
+                const subWidth = ctx.measureText(labelSub).width;
+                ctx.font = "bold 13px sans-serif";
+                const mainWidth = ctx.measureText(labelMain).width;
+                const valWidth = ctx.measureText(valueText).width;
+
+                if (isMobile) {
+                    const labelLine1 = "はじめの位置エネルギー";
+                    const labelLine2Main = "U";
+                    
+                    const line1Width = ctx.measureText(labelLine1).width;
+                    const line2MainWidth = ctx.measureText(labelLine2Main).width;
+                    const line2Width = line2MainWidth + subWidth + valWidth;
+                    const maxWidth = Math.max(line1Width, line2Width);
+                    const startX = viewWidth - 20 - maxWidth;
+
+                    // 1行目: 「はじめの位置エネルギー」
+                    ctx.fillText(labelLine1, startX + (maxWidth - line1Width), initObjY - 22);
+
+                    // 2行目: 「U_はじめ = 〇〇 J」
+                    const startX2 = startX + (maxWidth - line2Width);
+                    ctx.fillText(labelLine2Main, startX2, initObjY - 6);
+                    ctx.font = "bold 9px sans-serif";
+                    ctx.fillText(labelSub, startX2 + line2MainWidth, initObjY - 3);
+                    ctx.font = "bold 13px sans-serif";
+                    ctx.fillText(valueText, startX2 + line2MainWidth + subWidth, initObjY - 6);
+                } else {
+                    const totalWidth = mainWidth + subWidth + valWidth;
+                    const startX = viewWidth - 20 - totalWidth;
+                    
+                    // メインテキスト U までの描画（かぶりをなくすためstartXから描画開始）
+                    ctx.fillText(labelMain, startX, initObjY - 8);
+                    // 下付き文字「はじめ」の描画（基準線よりやや下げる）
+                    ctx.font = "bold 9px sans-serif";
+                    ctx.fillText(labelSub, startX + mainWidth, initObjY - 5);
+                    // 「 = 〇〇 J」の描画
+                    ctx.font = "bold 13px sans-serif";
+                    ctx.fillText(valueText, startX + mainWidth + subWidth, initObjY - 8);
+                }
+                ctx.restore();
+            }
+
+            // あとの位置エネルギー（U_あと）の水平ガイド線と値をリアルタイムで描画（「あと」を下付き文字のように表現）
+            const isInitialState = Math.abs(objY - initObjY) < 1.0;
+            if (!isInitialState) {
+                ctx.save();
+                ctx.strokeStyle = "rgba(124, 58, 237, 0.6)"; // より見やすい紫系の色・太さに変更
+                ctx.lineWidth = 2;
+                ctx.setLineDash([4, 4]);
+                ctx.beginPath();
+                ctx.moveTo(0, objY);
+                ctx.lineTo(viewWidth, objY);
+                ctx.stroke();
+                
+                ctx.fillStyle = "#7c3aed"; // Purple-600
+                ctx.font = "bold 13px sans-serif";
+                ctx.textAlign = "left"; // 左揃えにして計算のバグを修正
+                
+                const hCurrent = (groundY - objY) / pxPerMeter;
+                const currentPE = mass * g * hCurrent;
+                const valTextCurrent = ` = ${currentPE.toFixed(2)} J`;
+                
+                const labelMainCurrent = "あとの位置エネルギー U";
+                const labelSubCurrent = "あと";
+                
+                ctx.font = "bold 9px sans-serif";
+                const subWidthCur = ctx.measureText(labelSubCurrent).width;
+                ctx.font = "bold 13px sans-serif";
+                const mainWidthCur = ctx.measureText(labelMainCurrent).width;
+                const valWidthCur = ctx.measureText(valTextCurrent).width;
+                
+                if (isMobile) {
+                    const labelLine1 = "あとの位置エネルギー";
+                    const labelLine2Main = "U";
+                    
+                    const line1Width = ctx.measureText(labelLine1).width;
+                    const line2MainWidth = ctx.measureText(labelLine2Main).width;
+                    const line2Width = line2MainWidth + subWidthCur + valWidthCur;
+                    const maxWidth = Math.max(line1Width, line2Width);
+                    const startXCur = viewWidth - 20 - maxWidth;
+
+                    // 1行目: 「あとの位置エネルギー」
+                    ctx.fillText(labelLine1, startXCur + (maxWidth - line1Width), objY - 22);
+
+                    // 2行目: 「U_あと = 〇〇 J」
+                    const startX2 = startXCur + (maxWidth - line2Width);
+                    ctx.fillText(labelLine2Main, startX2, objY - 6);
+                    ctx.font = "bold 9px sans-serif";
+                    ctx.fillText(labelSubCurrent, startX2 + line2MainWidth, objY - 3);
+                    ctx.font = "bold 13px sans-serif";
+                    ctx.fillText(valTextCurrent, startX2 + line2MainWidth + subWidthCur, objY - 6);
+                } else {
+                    const totalWidthCur = mainWidthCur + subWidthCur + valWidthCur;
+                    const startXCur = viewWidth - 20 - totalWidthCur;
+                    
+                    // メインテキスト U までの描画（かぶりをなくすためstartXCurから描画開始）
+                    ctx.fillText(labelMainCurrent, startXCur, objY - 8);
+                    // 下付き文字「あと」の描画
+                    ctx.font = "bold 9px sans-serif";
+                    ctx.fillText(labelSubCurrent, startXCur + mainWidthCur, objY - 5);
+                    // 「 = 〇〇 J」の描画
+                    ctx.font = "bold 13px sans-serif";
+                    ctx.fillText(valTextCurrent, startXCur + mainWidthCur + subWidthCur, objY - 8);
+                }
+                ctx.restore();
+            }
+
+            // はじめの位置と後の位置を繋ぐ垂直矢印の描画（木箱の左側にまっすぐ）
+            if (Math.abs(objY - initObjY) > 2) {
+                // ラベルは空文字にして矢印本体だけ描画
+                drawArrow(objX - 50, initObjY, objY - initObjY, "#f97316", "", true);
+
+                // オレンジの矢印の左側に下付き文字を伴う「重力がした仕事 W_重力 = 〇〇 J」を描画
+                ctx.save();
+                ctx.fillStyle = "#f97316"; // Orange-500
+                ctx.font = "bold 13px sans-serif";
+                
+                const hInit = (groundY - initObjY) / pxPerMeter;
+                const hCurrent = (groundY - objY) / pxPerMeter;
+                const gravityWork = mass * g * (hInit - hCurrent);
+                const valueText = ` = ${gravityWork.toFixed(2)} J`;
+                
+                const labelMain = "W";
+                const labelSub = "重力";
+
+                ctx.font = "bold 9px sans-serif";
+                const subWidth = ctx.measureText(labelSub).width;
+                ctx.font = "bold 13px sans-serif";
+                const mainWidth = ctx.measureText(labelMain).width;
+                const valWidth = ctx.measureText(valueText).width;
+                const line2Width = mainWidth + subWidth + valWidth; // 2行目の横幅
+                
+                const textY = objY - 8; // 矢印の先端付近の横に表示
+
+                if (isMobile) {
+                    // スマホ縦画面の時は2行にして描画
+                    const labelLine1 = "重力がした仕事";
+                    const line1Width = ctx.measureText(labelLine1).width;
+                    const maxWidth = Math.max(line1Width, line2Width);
+                    
+                    // 矢印（objX - 50）の左側、少し離した位置
+                    let startX = (objX - 50) - 15 - maxWidth;
+                    
+                    // 下向き正の軸や文字（x = 15付近）と重ならないように制限
+                    const limitX = 20;
+                    if (startX < limitX) {
+                        startX = limitX;
+                    }
+                    
+                    ctx.textAlign = "left";
+                    // 1行目: 「重力がした仕事」 (位置エネルギー表示に合わせたY座標比率)
+                    ctx.fillText(labelLine1, startX + (maxWidth - line1Width) / 2, objY - 22);
+                    
+                    // 2行目: 「W_重力 = 〇〇 J」 (行間を16pxに揃え、下付き文字の補正を合わせる)
+                    const startX2 = startX + (maxWidth - line2Width) / 2;
+                    const line2Y = objY - 6;
+                    ctx.fillText(labelMain, startX2, line2Y);
+                    ctx.font = "bold 9px sans-serif";
+                    ctx.fillText(labelSub, startX2 + mainWidth, line2Y + 3);
+                    ctx.font = "bold 13px sans-serif";
+                    ctx.fillText(valueText, startX2 + mainWidth + subWidth, line2Y);
+                } else {
+                    // PCやワイド画面の時は1行で描画
+                    const labelFull = "重力がした仕事 W";
+                    const labelFullWidth = ctx.measureText(labelFull).width;
+                    const totalWidth = labelFullWidth + subWidth + valWidth;
+                    const startX = (objX - 50) - 15 - totalWidth;
+                    
+                    ctx.textAlign = "left";
+                    ctx.fillText(labelFull, startX, textY);
+                    ctx.font = "bold 9px sans-serif";
+                    ctx.fillText(labelSub, startX + labelFullWidth, textY + 3);
+                    ctx.font = "bold 13px sans-serif";
+                    ctx.fillText(valueText, startX + labelFullWidth + subWidth, textY);
+                }
+                ctx.restore();
+            }
+
+            // 物体の描画 (木箱)
+            ctx.fillStyle = "#d97706";
+            ctx.fillRect(objX - size/2, objY - size, size, size);
+            ctx.strokeStyle = "#92400e";
+            ctx.lineWidth = 2;
+            ctx.strokeRect(objX - size/2, objY - size, size, size);
+            
+            // 木箱の×印
+            ctx.beginPath();
+            ctx.moveTo(objX - size/2, objY - size);
+            ctx.lineTo(objX + size/2, objY);
+            ctx.moveTo(objX + size/2, objY - size);
+            ctx.lineTo(objX - size/2, objY);
+            ctx.stroke();
+
+            // 力のベクトル（重力のみ、作用点は物体の重心中心）
+            const forceScale = 5;
+            const gravityLen = mass * g * forceScale;
+            drawArrow(objX, objY - size/2, gravityLen, "#ef4444", "重力 mg");
+
+            requestAnimationFrame(draw);
+        }
+
+        // ロード時に初期化
+        window.onload = function() {
+            init(true);
+            draw();
+        };
+    </script>
+</body>
+</html>

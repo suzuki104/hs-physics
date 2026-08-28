@@ -1,0 +1,919 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>仕事と位置エネルギー|高校物理アニメーション教材</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- MathJax による LaTeX 数式のレンダリング -->
+    <script>
+        window.MathJax = {
+            tex: {
+                inlineMath: [['$', '$'], ['\\(', '\\)']],
+                displayMath: [['$$', '$$'], ['\\[', '\\]']]
+            }
+        };
+    </script>
+    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <style>
+        body {
+            background-color: #f8fafc;
+        }
+        #canvas-container {
+            position: relative;
+            width: 100%;
+            height: 70vh;
+            background: linear-gradient(to bottom, #e2e8f0 0%, #ffffff 100%);
+            border-bottom: 4px solid #475569;
+            cursor: default;
+            touch-action: auto; /* none から auto に変更し、キャンバスを触っても通常時はスクロールできるように変更 */
+        }
+        #canvas-container:active {
+            cursor: grabbing;
+        }
+        .label {
+            pointer-events: none;
+            user-select: none;
+        }
+    </style>
+</head>
+<body class="p-4 md:p-8">
+    <div class="max-w-4xl mx-auto bg-white rounded-xl shadow-2xl overflow-hidden">
+        <div class="p-6 border-b border-gray-100 text-center">
+            <h1 class="text-2xl font-bold text-gray-800">仕事と位置エネルギー</h1>
+            <p class="text-gray-600 mt-2">ゴール「G」を好きな位置に動かしてから、「経路作図スタート」ボタンを押して経路をゴールまで繋げてください。</p>
+        </div>
+
+        <div id="canvas-container" class="relative">
+            <canvas id="simCanvas"></canvas>
+            
+            <!-- 設定パネル -->
+            <div class="absolute bottom-4 right-4 flex gap-2">
+                <button id="drawPathStartBtn" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-500 transition shadow-lg">
+                    経路作図スタート
+                </button>
+                <button id="startBtn" class="px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-500 transition shadow-lg hidden">
+                    スタート
+                </button>
+                <button id="clearPathBtn" class="px-4 py-2 bg-rose-600 text-white rounded-lg hover:bg-rose-500 transition shadow-lg hidden">
+                    経路クリア
+                </button>
+                <button id="resetBtn" class="px-4 py-2 bg-gray-800 text-white rounded-lg hover:bg-gray-700 transition shadow-lg">
+                    リセット
+                </button>
+            </div>
+        </div>
+
+        <!-- 解説・シミュレーション値エリア -->
+        <div class="p-6 bg-gray-50 space-y-6">
+
+            <!-- シミュレーション値をキャンバス外の下に配置 -->
+            <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-100">
+                <!-- パソコンでは一列（4列グリッド）、スマホでは2列グリッドで表示。ゴールの位置エネルギーと手がした仕事が一列目（上段）に並び、現在の高さと質量が二列目（下段）に並ぶよう順番を調整 -->
+                <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                    <!-- 1列目（上段）：位置エネルギーと手がした仕事 -->
+                    <div class="flex flex-col p-2 bg-slate-50 rounded-lg">
+                        <span class="text-xs text-gray-500">ゴールの位置エネルギー<br>($U = mgh$):</span>
+                        <span id="displayGoalPE" class="text-lg font-mono font-bold text-purple-600">0.00 J</span>
+                    </div>
+                    <div class="flex flex-col p-2 bg-slate-50 rounded-lg">
+                        <span class="text-xs text-gray-500">手がした仕事<br>($W = F \cdot s$):</span>
+                        <span id="displayWork" class="text-lg font-mono font-bold text-orange-600">0.00 J</span>
+                    </div>
+                    <!-- 2列目（下段）：現在の高さと物体の質量 -->
+                    <div class="flex flex-col p-2 bg-slate-50 rounded-lg">
+                        <span class="text-xs text-gray-500">現在の高さ<br>($y$):</span>
+                        <span id="displayHeight" class="text-lg font-mono font-bold text-blue-600">0.00 m</span>
+                    </div>
+                    <div class="flex flex-col p-2 bg-slate-50 rounded-lg">
+                        <span class="text-xs text-gray-500">物体の質量<br>($m$):</span>
+                        <span class="text-lg font-mono font-bold text-gray-700">2.00 kg</span>
+                    </div>
+                    <!-- 移動距離表示は非表示のまま維持 -->
+                    <div class="flex flex-col hidden">
+                        <span id="displayDistance">0.00 m</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ※の説明をアニメーション（キャンバス）のすぐ下に配置 -->
+            <p class="text-xs text-gray-500 italic text-center">
+                ※ ゆっくり（等速で）動かしていると仮定し、常に「力のつり合い」の状態を表示しています。
+            </p>
+
+            <!-- 物理のポイント（見出し語句「物理のポイント」を削除） -->
+            <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-100">
+                <p class="text-sm text-gray-600 leading-relaxed">
+                    仕事 $W$ は、力 $F$ とその方向に動いた距離 $s$ の積（$F \times s$）で決まります。物体を同じ高さまで運ぶときの手がした仕事は、経路によらず同じ値になります。
+                </p>
+            </div>
+
+
+        </div>
+
+        <!-- ナビゲーション・コピーライト -->
+        <div class="p-6 bg-white border-t border-gray-100">
+            <div class="flex flex-col items-center gap-6 sm:gap-8 pt-6 sm:pt-8 border-t border-slate-100">
+                <div class="flex gap-4 sm:gap-6 text-sm font-bold">
+                    <!--//20260810
+                    <a href="../6.0_home/home.html" class="flex items-center gap-2 px-6 sm:px-8 py-3 sm:py-4 bg-slate-800 text-white rounded-2xl hover:bg-slate-700 transition-colors">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path>
+                        </svg>
+                        ホーム
+                    </a>
+                    <a href="../6.1_physics_home/physics_home.html" class="flex items-center gap-2 px-6 sm:px-8 py-3 sm:py-4 bg-slate-800 text-white rounded-2xl hover:bg-slate-700 transition-colors">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M4 6h16M4 12h16M4 18h16"></path>
+                        </svg>
+                        物理一覧
+                    </a>//20260810-->
+                </div>
+                <p class="text-[10px] sm:text-[11px] text-slate-400">Copyright &copy; 2021-<span id="currentYear"></span> T.Suzuki</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('simCanvas');
+        const ctx = canvas.getContext('2d');
+        const container = document.getElementById('canvas-container');
+        
+        // UI elements
+        const displayHeight = document.getElementById('displayHeight');
+        const displayDistance = document.getElementById('displayDistance');
+        const displayWork = document.getElementById('displayWork');
+        const displayGoalPE = document.getElementById('displayGoalPE');
+        const resetBtn = document.getElementById('resetBtn');
+        const startBtn = document.getElementById('startBtn');
+        const clearPathBtn = document.getElementById('clearPathBtn');
+        const drawPathStartBtn = document.getElementById('drawPathStartBtn');
+
+        // 物理定数・設定
+        const g = 9.8; // 重力加速度
+        const mass = 2.0; // 質量 (kg)
+        const pxPerMeter = 100; // 1メートルあたりのピクセル
+        
+        // 状態変数
+        let objX, objY, startY, groundY;
+        let totalWork = 0;
+        let totalDistance = 0;
+        let lastX, lastY;
+
+        // 経路設定・ゴール用の状態変数
+        let pathPoints = []; // 経路のポイント配列 {x, y}
+        let isPlaying = false; // 自動再生中か
+        let isPlayCompleted = false; // 自動再生がゴールに到達して完了したか
+        let isDrawingMode = false; // 経路作図モードが有効か
+        let isDraggingGoal = false; // ゴールのドラッグ中か
+        let isConnectedToGoal = false; // ゴールと正しく接続したか
+        let preConnectLength = 0; // ゴール接続直前の経路配列の長さを保持
+        let goalX, goalY; // ゴールの座標
+        let currentTargetIndex = 0; // 自動再生中の目標ポイントのインデックス
+        const autoSpeed = 1.2; // 自動再生時の移動速度(ピクセル/フレーム)
+        let initObjX, initObjY; // 初期位置の保存用
+
+        // プレビュー・カーソル追跡用の変数
+        let currentMouseX = null;
+        let currentMouseY = null;
+
+        // 論理上のキャンバスサイズ（画質を損なわないためのDPR対応用論理座標）
+        let viewWidth = 800;
+        let viewHeight = 500;
+
+        function init(isFirstLoad = false) {
+            resize();
+            groundY = viewHeight - 120; // 120pxに引き上げて、重力の作図が下に見切れる不具合を解消
+            
+            // 物体の初期位置を確実にキャンバス中央下の床の上に設定
+            objX = viewWidth / 2;
+            objY = groundY;
+            initObjX = objX;
+            initObjY = objY;
+            lastX = objX;
+            lastY = objY;
+            
+            totalWork = 0;
+            totalDistance = 0;
+            pathPoints = [];
+            isPlaying = false;
+            isPlayCompleted = false;
+            isDrawingMode = false;
+            isDraggingGoal = false;
+            isConnectedToGoal = false;
+            currentTargetIndex = 0;
+
+            // 初回読み込み時のみゴールの初期位置を設定。リセット時はゴールの位置をそのまま残す。
+            if (isFirstLoad) {
+                goalX = viewWidth * 0.75; // 右側のデフォルト位置
+                goalY = groundY - 300;       // 床の上空 (300px = 3.0m の高度に変更)
+            }
+
+            updateUI();
+            updateButtons();
+            
+            // コピーライトの年度を自動更新
+            document.getElementById('currentYear').innerText = new Date().getFullYear();
+        }
+
+        function resize() {
+            const dpr = window.devicePixelRatio || 1;
+            viewWidth = container.clientWidth || 800;  // ロード時にサイズが取得できない場合の安全なフォールバック
+            viewHeight = container.clientHeight || 500;
+            
+            // 描画バッファサイズをデバイス解像度に合わせる (アニメーションの画質粗さを解消)
+            canvas.width = viewWidth * dpr;
+            canvas.height = viewHeight * dpr;
+            
+            // CSS表示サイズを論理ピクセルに固定
+            canvas.style.width = viewWidth + 'px';
+            canvas.style.height = viewHeight + 'px';
+            
+            ctx.resetTransform();
+            ctx.scale(dpr, dpr);
+            
+            groundY = viewHeight - 120; // 120pxに引き上げて見切れを解消
+            initObjX = viewWidth / 2;
+            initObjY = groundY;
+            
+            // まだ一歩も進んでいない初期状態の時のみ、リサイズに応じてスタートのS座標を同期させてズレを防ぐ
+            if (pathPoints.length === 0 && !isDrawingMode && !isPlaying && !isPlayCompleted) {
+                objX = initObjX;
+                objY = initObjY;
+                lastX = objX;
+                lastY = objY;
+            }
+            
+            // 物体が画面外に行かないように調整
+            if (objY > groundY) objY = groundY;
+            // ゴールが画面外に出ていた場合に調整
+            if (goalX !== undefined) {
+                goalX = Math.max(40, Math.min(viewWidth - 40, goalX));
+                goalY = Math.max(40, Math.min(groundY, goalY));
+            }
+        }
+
+        window.addEventListener('resize', resize);
+
+        // イベントリスナー
+        container.addEventListener('mousedown', startDrag);
+        container.addEventListener('mousemove', drag);
+        window.addEventListener('mouseup', endDrag);
+        
+        // マウス移動時のカーソル形状の変更およびプレビュー座標の追跡
+        container.addEventListener('mousemove', (e) => {
+            const rect = canvas.getBoundingClientRect();
+            currentMouseX = e.clientX - rect.left;
+            currentMouseY = e.clientY - rect.top;
+
+            if (isPlaying) {
+                canvas.style.cursor = 'default';
+                return;
+            }
+
+            if (isDraggingGoal) {
+                canvas.style.cursor = 'grabbing';
+            } else if (goalX !== undefined && goalY !== undefined) {
+                const dist = Math.sqrt((currentMouseX - goalX) ** 2 + (currentMouseY - goalY) ** 2);
+                
+                if (isDrawingMode) {
+                    canvas.style.cursor = 'crosshair'; // 作図モード時は常に十字
+                } else if (dist < 20 && pathPoints.length === 0) {
+                    canvas.style.cursor = 'grab'; // 作図前かつゴールの近くであれば掴むカーソル
+                } else {
+                    canvas.style.cursor = 'default';
+                }
+            } else {
+                canvas.style.cursor = 'default';
+            }
+        });
+
+        container.addEventListener('mouseleave', () => {
+            currentMouseX = null;
+            currentMouseY = null;
+        });
+        
+        // スマートフォンのタッチ操作（開始・移動・終了）の統合とスクロール制御の最適化
+        container.addEventListener('touchstart', (e) => {
+            if (isPlaying) return;
+            
+            const touch = e.touches[0];
+            const rect = canvas.getBoundingClientRect();
+            const mouseX = touch.clientX - rect.left;
+            const mouseY = touch.clientY - rect.top;
+
+            // ゴールとの当たり判定（作図が開始されておらず、経路がない状態のときのみ動かせる）
+            if (goalX !== undefined && goalY !== undefined && !isDrawingMode && pathPoints.length === 0) {
+                const dist = Math.sqrt((mouseX - goalX) ** 2 + (mouseY - goalY) ** 2);
+                if (dist < 25) { // タッチ判定は少し広めに
+                    isDraggingGoal = true;
+                    
+                    // ゴールを動かし始めたら、もし既に接続されていた場合は接続前の状態へ戻す
+                    if (isConnectedToGoal) {
+                        isConnectedToGoal = false;
+                        pathPoints = pathPoints.slice(0, preConnectLength);
+                        updateButtons();
+                    }
+                    e.preventDefault(); // ゴール移動時はページがスクロールしないようにする
+                    return;
+                }
+            }
+
+            // 作図モード中のタッチ開始：プレビュー座標を設定し、スクロールを抑止
+            if (isDrawingMode) {
+                currentMouseX = mouseX;
+                currentMouseY = mouseY;
+                e.preventDefault(); 
+            }
+        }, { passive: false });
+        
+        container.addEventListener('touchmove', (e) => {
+            if (isPlaying) return;
+            const touch = e.touches[0];
+            const rect = canvas.getBoundingClientRect();
+            const mouseX = touch.clientX - rect.left;
+            const mouseY = touch.clientY - rect.top;
+
+            if (isDraggingGoal) {
+                drag(touch);
+                e.preventDefault(); // ドラッグ中はスクロールを抑止
+            } else if (isDrawingMode) {
+                currentMouseX = mouseX;
+                currentMouseY = mouseY;
+                e.preventDefault(); // 作図中はスクロールを抑止して線を引きやすくする
+            }
+        }, { passive: false });
+        
+        container.addEventListener('touchend', (e) => {
+            if (isPlaying) return;
+
+            if (isDraggingGoal) {
+                endDrag();
+                e.preventDefault();
+            } else if (isDrawingMode) {
+                // スマホ：指を離した瞬間に、プレビューされていた点線の位置でチェックポイント（またはゴール）を確定する
+                confirmPreviewPoint();
+                currentMouseX = null;
+                currentMouseY = null;
+                e.preventDefault();
+            }
+        }, { passive: false });
+
+        resetBtn.addEventListener('click', () => {
+            init(false); // ゴール位置はクリアしない
+        });
+
+        drawPathStartBtn.addEventListener('click', () => {
+            if (isPlaying) return;
+            isDrawingMode = true;
+            isPlayCompleted = false;
+            // 作図スタート位置は、物体が「今いる位置」
+            initObjX = objX;
+            initObjY = objY;
+            lastX = objX;
+            lastY = objY;
+            updateButtons();
+        });
+
+        startBtn.addEventListener('click', () => {
+            if (pathPoints.length === 0 || isPlaying || !isConnectedToGoal) return;
+            // 再生開始前に物体を初期位置に戻し、仕事をリセット
+            objX = initObjX;
+            objY = initObjY;
+            lastX = initObjX;
+            lastY = initObjY;
+            totalWork = 0;
+            totalDistance = 0;
+            updateUI();
+
+            isPlaying = true;
+            isPlayCompleted = false;
+            isDrawingMode = false; // シミュレーションスタートと同時に作図モードは終了
+            currentTargetIndex = 0;
+            updateButtons();
+        });
+
+        clearPathBtn.addEventListener('click', () => {
+            pathPoints = [];
+            isPlaying = false;
+            isPlayCompleted = false;
+            isDraggingGoal = false;
+            isConnectedToGoal = false;
+            isDrawingMode = false; // クリアしたら一旦作図モードを解除
+            objX = initObjX;
+            objY = initObjY;
+            lastX = initObjX;
+            lastY = initObjY;
+            totalWork = 0;
+            totalDistance = 0;
+            updateUI();
+            updateButtons();
+        });
+
+        function startDrag(e) {
+            if (isPlaying) return;
+
+            const rect = canvas.getBoundingClientRect();
+            const mouseX = e.clientX - rect.left;
+            const mouseY = e.clientY - rect.top;
+
+            // ゴールとの当たり判定（作図が開始されておらず、経路がない状態のときのみ動かせる）
+            if (goalX !== undefined && goalY !== undefined && !isDrawingMode && pathPoints.length === 0) {
+                const dist = Math.sqrt((mouseX - goalX) ** 2 + (mouseY - goalY) ** 2);
+                if (dist < 20) {
+                    isDraggingGoal = true;
+                    
+                    // ゴールを動かし始めたら、もし既に接続されていた場合は接続前の状態へ戻す
+                    if (isConnectedToGoal) {
+                        isConnectedToGoal = false;
+                        pathPoints = pathPoints.slice(0, preConnectLength);
+                        updateButtons();
+                    }
+                    return; // ドラッグ開始のため新規経路追加はしない
+                }
+            }
+
+            // 作図モード中のみポイント確定を許可
+            if (isDrawingMode) {
+                confirmPreviewPoint();
+            }
+        }
+
+        // ゴールに直交（縦・横のみ）で接続するヘルパー関数
+        function tryConnectToGoal(prevX, prevY) {
+            preConnectLength = pathPoints.length; // 接続前の長さを記録
+            
+            // 直前の点からゴールの座標に向かって直交ルートで繋ぐ
+            if (Math.abs(prevX - goalX) > 5 && Math.abs(prevY - goalY) > 5) {
+                // 水平に移動した後に垂直に繋ぐ経由点を追加
+                pathPoints.push({ x: goalX, y: prevY });
+            }
+            pathPoints.push({ x: goalX, y: goalY });
+            isConnectedToGoal = true;
+            isDrawingMode = false; // ゴールと繋がったら作図完了
+            updateButtons();
+        }
+
+        // カーソルプレビューされているポイント（またはゴール接続）を確定する
+        function confirmPreviewPoint() {
+            if (isConnectedToGoal || isPlaying || isDraggingGoal || !isDrawingMode) return;
+            if (currentMouseX === null || currentMouseY === null) return;
+
+            // 直前のポイント（まだ経路がなければ初期位置）
+            let prevX = pathPoints.length > 0 ? pathPoints[pathPoints.length - 1].x : initObjX;
+            let prevY = pathPoints.length > 0 ? pathPoints[pathPoints.length - 1].y : initObjY;
+
+            // 水平・垂直線へのスナップ
+            let tempY = currentMouseY;
+            let tempX = currentMouseX;
+            const snapThreshold = 20;
+            if (Math.abs(tempY - goalY) < snapThreshold) tempY = goalY;
+            if (Math.abs(tempX - goalX) < snapThreshold) tempX = goalX;
+
+            tempY = Math.min(groundY, Math.max(40, tempY));
+            tempX = Math.max(40, Math.min(viewWidth - 40, tempX));
+
+            // ゴールへの接続判定（プレビュー時点でゴール周辺に吸い寄せられている、もしくはゴールを直接クリックした場合）
+            const distClickToGoal = Math.sqrt((tempX - goalX) ** 2 + (tempY - goalY) ** 2);
+            const distDirectToGoal = Math.sqrt((currentMouseX - goalX) ** 2 + (currentMouseY - goalY) ** 2);
+
+            if (distClickToGoal < 40 || distDirectToGoal < 40) {
+                tryConnectToGoal(prevX, prevY);
+                return;
+            }
+
+            const dx = tempX - prevX;
+            const dy = tempY - prevY;
+
+            let newX = prevX;
+            let newY = prevY;
+
+            // X軸とY軸で移動量が大きい方を優先（斜め移動を禁止）
+            if (Math.abs(dx) > Math.abs(dy)) {
+                newX = tempX; // 横移動
+            } else {
+                newY = tempY; // 縦移動
+            }
+
+            // クリック位置が直前とほとんど変わらない場合は無視
+            if (Math.abs(newX - prevX) < 5 && Math.abs(newY - prevY) < 5) return;
+
+            pathPoints.push({ x: newX, y: newY });
+
+            // 追加した最新の点がゴールに近づいたか判定し、近ければ吸い込み接続を行う
+            const distToGoalAfter = Math.sqrt((newX - goalX) ** 2 + (newY - goalY) ** 2);
+            if (distToGoalAfter < 40) {
+                tryConnectToGoal(newX, newY);
+            } else {
+                updateButtons();
+            }
+        }
+
+        function updateButtons() {
+            // 「経路作図スタート」ボタン：まだ作図モードでなく、再生中でなく、ゴールと未接続のとき表示
+            if (!isDrawingMode && !isPlaying && !isConnectedToGoal) {
+                drawPathStartBtn.classList.remove('hidden');
+            } else {
+                drawPathStartBtn.classList.add('hidden');
+            }
+
+            // ゴールと正しく接続した時のみ、スタートボタンを表示
+            if (isConnectedToGoal && !isPlaying && !isPlayCompleted) {
+                startBtn.classList.remove('hidden');
+            } else {
+                startBtn.classList.add('hidden');
+            }
+
+            // 経路が存在する、または作図中のとき、再生中でなく、かつ再生完了（ゴール到達）していなければクリアボタンを表示
+            if ((pathPoints.length > 0 || isDrawingMode) && !isPlaying && !isPlayCompleted) {
+                clearPathBtn.classList.remove('hidden');
+            } else {
+                clearPathBtn.classList.add('hidden');
+            }
+        }
+
+        function drag(e) {
+            // 作図中、または既に経路が存在する場合は、ゴールのドラッグ（位置調整）を禁止
+            if (!isDraggingGoal || isDrawingMode || pathPoints.length > 0) return;
+
+            const rect = canvas.getBoundingClientRect();
+            const mouseX = e.clientX - rect.left;
+            const mouseY = e.clientY - rect.top;
+
+            // ゴールのドラッグ（斜め制限を解除、キャンバス内は全方向自由）
+            let nextX = Math.max(40, Math.min(viewWidth - 40, mouseX));
+            let nextY = Math.max(40, Math.min(groundY, mouseY));
+
+            goalX = nextX;
+            goalY = nextY;
+            updateUI(); // 位置エネルギーのリアルタイム更新
+        }
+
+        function endDrag() {
+            isDraggingGoal = false;
+        }
+
+        function updateUI() {
+            const h = (groundY - objY) / pxPerMeter;
+            displayHeight.innerText = `${h.toFixed(2)} m`;
+            displayDistance.innerText = `${totalDistance.toFixed(2)} m`;
+            displayWork.innerText = `${totalWork.toFixed(2)} J`;
+
+            // ゴールの位置エネルギー（U = mgh）を計算して更新
+            if (goalY !== undefined && groundY !== undefined) {
+                const hGoal = (groundY - goalY) / pxPerMeter;
+                const peGoal = mass * g * hGoal;
+                displayGoalPE.innerText = `${peGoal.toFixed(2)} J`;
+            }
+        }
+
+        // 自動等速移動ロジック
+        function updatePhysics() {
+            if (!isPlaying) return;
+
+            if (currentTargetIndex >= pathPoints.length) {
+                isPlaying = false;
+                isPlayCompleted = true; // ゴールに到達しアニメーションが完了
+                updateButtons();
+                return;
+            }
+
+            const target = pathPoints[currentTargetIndex];
+            const dx = target.x - objX;
+            const dy = target.y - objY;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+
+            if (dist < autoSpeed) {
+                // 目標ポイントに到達したとみなし位置をぴったり重ねる
+                const actualDx = (target.x - lastX) / pxPerMeter;
+                const actualDy = (lastY - target.y) / pxPerMeter;
+                
+                if (actualDy !== 0) {
+                    const force = mass * g;
+                    totalWork += force * actualDy;
+                }
+                totalDistance += Math.sqrt(actualDx * actualDx + actualDy * actualDy);
+
+                objX = target.x;
+                objY = target.y;
+                lastX = objX;
+                lastY = objY;
+                
+                currentTargetIndex++;
+                updateUI();
+            } else {
+                // 等速移動の計算
+                const moveX = (dx / dist) * autoSpeed;
+                const moveY = (dy / dist) * autoSpeed;
+
+                const nextX = objX + moveX;
+                const nextY = objY + moveY;
+
+                const stepDx = (nextX - lastX) / pxPerMeter;
+                const stepDy = (lastY - nextY) / pxPerMeter;
+
+                if (stepDy !== 0) {
+                    const force = mass * g;
+                    totalWork += force * stepDy;
+                }
+                totalDistance += Math.sqrt(stepDx * stepDx + stepDy * stepDy);
+
+                objX = nextX;
+                objY = nextY;
+                lastX = nextX;
+                lastY = nextY;
+
+                updateUI();
+            }
+        }
+
+        function drawArrow(x, y, length, color, label) {
+            if (length === 0) return;
+            
+            ctx.beginPath();
+            ctx.strokeStyle = color;
+            ctx.fillStyle = color;
+            ctx.lineWidth = 3;
+
+            const headlen = 10;
+            const endY = y + length;
+            
+            ctx.moveTo(x, y);
+            ctx.lineTo(x, endY);
+            ctx.stroke();
+
+            // 矢尻
+            ctx.beginPath();
+            const angle = length > 0 ? Math.PI / 2 : -Math.PI / 2;
+            ctx.moveTo(x, endY);
+            ctx.lineTo(x - headlen * Math.cos(angle - Math.PI/6), endY - headlen * Math.sin(angle - Math.PI/6));
+            ctx.lineTo(x - headlen * Math.cos(angle + Math.PI/6), endY - headlen * Math.sin(angle + Math.PI/6));
+            ctx.fill();
+
+            // ラベル表示
+            ctx.font = "bold 14px sans-serif";
+            ctx.fillText(label, x + 15, endY);
+        }
+
+        // アップロード画像を元にした「手のグラフィック」を描画する関数
+        function drawHand(x, y) {
+            ctx.save();
+            
+            // スタイル設定：太めの黒い輪郭線、白い塗りつぶし
+            ctx.strokeStyle = "#000000";
+            ctx.fillStyle = "#ffffff";
+            ctx.lineWidth = 2.5;
+            ctx.lineJoin = "round";
+            ctx.lineCap = "round";
+
+            // 1. 手の全体（手のひら、奥の指、手首）
+            ctx.beginPath();
+            // 手首の右下（切り口の下端）から開始
+            ctx.moveTo(x + 55, y + 20);
+            
+            // 手首の下側から手のひらのふくらみを通り、反り返った指先（左端）へ
+            ctx.bezierCurveTo(x + 35, y + 25, x + 15, y + 26, x - 15, y + 18);
+            ctx.bezierCurveTo(x - 30, y + 14, x - 45, y + 7, x - 54, y - 1);
+            
+            // 人差し指・中指の先端の反り返りと丸み
+            ctx.bezierCurveTo(x - 57, y - 5, x - 50, y - 8, x - 45, y - 6);
+            
+            // 指の内側から、木箱を乗せる平らな手のひらへ
+            ctx.bezierCurveTo(x - 35, y - 2, x - 25, y - 1, x - 15, y - 1);
+            
+            // 物体にぴったり接する平らな面（x-15 から x+30 程度までほぼフラット）
+            ctx.lineTo(x + 30, y - 1);
+            
+            // 手首の上側（切り口の上端）へ
+            ctx.bezierCurveTo(x + 42, y - 1, x + 52, y + 2, x + 55, y + 4);
+            // 手首の右端の直線的な切り口
+            ctx.lineTo(x + 55, y + 20);
+            ctx.closePath();
+            
+            ctx.fill();
+            ctx.stroke();
+
+            // 2. 手前に重なる親指
+            ctx.beginPath();
+            // 親指の付け根
+            ctx.moveTo(x + 15, y + 2);
+            // 親指の上側のアウトライン
+            ctx.bezierCurveTo(x + 5, y - 4, x - 10, y - 4, x - 18, y + 1);
+            // 親指の指先
+            ctx.bezierCurveTo(x - 22, y + 3, x - 20, y + 7, x - 14, y + 7);
+            // 親指の下側のアウトライン（手のひら中央への合流）
+            ctx.bezierCurveTo(x - 5, y + 7, x + 5, y + 9, x + 12, y + 9);
+            
+            ctx.fill();
+            ctx.stroke();
+
+            ctx.restore();
+        }
+
+        function draw() {
+            // 自動等速移動の座標更新処理
+            updatePhysics();
+
+            ctx.clearRect(0, 0, viewWidth, viewHeight);
+
+            // 床の描画
+            ctx.beginPath();
+            ctx.strokeStyle = "#475569";
+            ctx.lineWidth = 2;
+            ctx.moveTo(0, groundY + 2);
+            ctx.lineTo(viewWidth, groundY + 2);
+            ctx.stroke();
+
+            // ゴール位置を通る水平線と鉛直線のガイド点線の描画
+            if (goalX !== undefined && goalY !== undefined) {
+                ctx.save();
+                ctx.beginPath();
+                ctx.strokeStyle = "rgba(148, 163, 184, 0.4)"; // 邪魔にならない薄いグレー
+                ctx.lineWidth = 1.5;
+                ctx.setLineDash([4, 4]);
+                // 水平線
+                ctx.moveTo(0, goalY);
+                ctx.lineTo(viewWidth, goalY);
+                // 鉛直線
+                ctx.moveTo(goalX, 0);
+                ctx.lineTo(goalX, viewHeight);
+                ctx.stroke();
+                ctx.restore();
+            }
+
+            // 設定済みの確定経路（点と直交する折れ線）を描画
+            if (pathPoints.length > 0) {
+                ctx.beginPath();
+                ctx.strokeStyle = "rgba(16, 185, 129, 0.5)"; // エメラルドグリーン（半透明）
+                ctx.lineWidth = 4;
+                ctx.setLineDash([5, 5]);
+                
+                // スタート地点から各経路を結ぶ
+                ctx.moveTo(initObjX, initObjY);
+                for (let i = 0; i < pathPoints.length; i++) {
+                    ctx.lineTo(pathPoints[i].x, pathPoints[i].y);
+                }
+                ctx.stroke();
+                ctx.setLineDash([]);
+
+                // 経路の中継ポイントを丸で描画（ゴールに吸収された直近部分は除いて表示）
+                const endLimit = isConnectedToGoal ? pathPoints.length - 1 : pathPoints.length;
+                for (let i = 0; i < endLimit; i++) {
+                    ctx.beginPath();
+                    ctx.arc(pathPoints[i].x, pathPoints[i].y, 6, 0, Math.PI * 2);
+                    ctx.fillStyle = "#10b981"; // 鮮やかなエメラルドグリーン
+                    ctx.fill();
+                    ctx.strokeStyle = "#ffffff";
+                    ctx.lineWidth = 1.5;
+                    ctx.stroke();
+                }
+            }
+
+            // カーソルの動きに合わせて伸びる動的なプレビュー点線の描画 (作図モード中のみ描画)
+            if (isDrawingMode && currentMouseX !== null && currentMouseY !== null && !isPlaying && !isDraggingGoal && !isConnectedToGoal) {
+                let prevX = pathPoints.length > 0 ? pathPoints[pathPoints.length - 1].x : initObjX;
+                let prevY = pathPoints.length > 0 ? pathPoints[pathPoints.length - 1].y : initObjY;
+
+                let tempY = currentMouseY;
+                let tempX = currentMouseX;
+                const snapThreshold = 20;
+                if (Math.abs(tempY - goalY) < snapThreshold) tempY = goalY;
+                if (Math.abs(tempX - goalX) < snapThreshold) tempX = goalX;
+
+                tempY = Math.min(groundY, Math.max(40, tempY));
+                tempX = Math.max(40, Math.min(viewWidth - 40, tempX));
+
+                // ゴール接続判定
+                const distClickToGoal = Math.sqrt((tempX - goalX) ** 2 + (tempY - goalY) ** 2);
+                const distDirectToGoal = Math.sqrt((currentMouseX - goalX) ** 2 + (currentMouseY - goalY) ** 2);
+
+                ctx.save();
+                ctx.beginPath();
+                ctx.strokeStyle = "rgba(16, 185, 129, 0.7)"; // 少し目立つ半透明のエメラルドグリーン
+                ctx.lineWidth = 3;
+                ctx.setLineDash([4, 4]);
+
+                if (distClickToGoal < 40 || distDirectToGoal < 40) {
+                    // ゴール付近ではゴールに吸い込まれる直交ラインをプレビュー
+                    ctx.moveTo(prevX, prevY);
+                    if (Math.abs(prevX - goalX) > 5 && Math.abs(prevY - goalY) > 5) {
+                        ctx.lineTo(goalX, prevY);
+                    }
+                    ctx.lineTo(goalX, goalY);
+                } else {
+                    // 通常の直交プレビューライン
+                    const dx = tempX - prevX;
+                    const dy = tempY - prevY;
+                    let pX = prevX;
+                    let pY = prevY;
+                    if (Math.abs(dx) > Math.abs(dy)) {
+                        pX = tempX;
+                    } else {
+                        pY = tempY;
+                    }
+                    ctx.moveTo(prevX, prevY);
+                    ctx.lineTo(pX, pY);
+                }
+                ctx.stroke();
+                ctx.restore();
+            }
+
+            // スタート（Sマーク）を、経路線の後に重ねて描画することで「経路がSマークよりも後ろ（Gと同様）」に配置されるよう順序を変更
+            if (initObjX !== undefined && initObjY !== undefined) {
+                ctx.save();
+                // アウターサークル
+                ctx.beginPath();
+                ctx.arc(initObjX, initObjY, 14, 0, Math.PI * 2);
+                ctx.fillStyle = "#2563eb"; // ロイヤルブルー
+                ctx.fill();
+                ctx.strokeStyle = "#ffffff";
+                ctx.lineWidth = 2;
+                ctx.stroke();
+
+                // インナーサークル
+                ctx.beginPath();
+                ctx.arc(initObjX, initObjY, 7, 0, Math.PI * 2);
+                ctx.fillStyle = "#ffffff";
+                ctx.fill();
+
+                // 「S」のラベルテキスト
+                ctx.fillStyle = "#2563eb";
+                ctx.font = "bold 10px sans-serif";
+                ctx.textAlign = "center";
+                ctx.textBaseline = "middle";
+                ctx.fillText("S", initObjX, initObjY);
+                ctx.restore();
+            }
+
+            // ゴール（最終点）を丸（Gマーク）で大きく描画（常に独立して表示）
+            if (goalX !== undefined && goalY !== undefined) {
+                // ドラッグ可能領域を示す光輪
+                ctx.beginPath();
+                ctx.arc(goalX, goalY, 18, 0, Math.PI * 2);
+                ctx.fillStyle = "rgba(225, 29, 72, 0.2)";
+                ctx.fill();
+
+                // ゴールのアウターサークル
+                ctx.beginPath();
+                ctx.arc(goalX, goalY, 14, 0, Math.PI * 2);
+                ctx.fillStyle = "#e11d48"; // ローズレッド
+                ctx.fill();
+                ctx.strokeStyle = "#ffffff";
+                ctx.lineWidth = 2;
+                ctx.stroke();
+
+                // ゴールのインナーサークル
+                ctx.beginPath();
+                ctx.arc(goalX, goalY, 7, 0, Math.PI * 2);
+                ctx.fillStyle = "#ffffff";
+                ctx.fill();
+
+                // 「G」のラベルテキスト
+                ctx.fillStyle = "#e11d48";
+                ctx.font = "bold 10px sans-serif";
+                ctx.textAlign = "center";
+                ctx.textBaseline = "middle";
+                ctx.fillText("G", goalX, goalY);
+            }
+
+            // 手の描画（木箱の直下 objY に配置）
+            drawHand(objX, objY);
+
+            // 物体の描画 (木箱風)
+            const size = 60;
+            ctx.fillStyle = "#d97706";
+            ctx.fillRect(objX - size/2, objY - size, size, size);
+            ctx.strokeStyle = "#92400e";
+            ctx.lineWidth = 2;
+            ctx.strokeRect(objX - size/2, objY - size, size, size);
+            // 木箱の×印
+            ctx.beginPath();
+            ctx.moveTo(objX - size/2, objY - size);
+            ctx.lineTo(objX + size/2, objY);
+            ctx.moveTo(objX + size/2, objY - size);
+            ctx.lineTo(objX - size/2, objY);
+            ctx.stroke();
+
+            // 力のベクトル描画
+            const forceScale = 5;
+            const gravityLen = mass * g * forceScale;
+            
+            // 重力 (作用点は物体の中心重心。再生中は作図を非表示にし、間隔を片側4pxと狭く変更)
+            if (!isPlaying) {
+                drawArrow(objX - 4, objY - size/2, gravityLen, "#ef4444", "重力 mg");
+            }
+            
+            // 手の力 (作用点は手と接触している下端面。間隔を片側4pxと狭く変更)
+            drawArrow(objX + 4, objY, -gravityLen, "#3b82f6", "手の力 F");
+
+            requestAnimationFrame(draw);
+        }
+
+        // HTML/CSSの読み込みとレイアウト配置が完全に完了した時点で初期化を実行する
+        window.onload = function() {
+            init(true);
+            draw();
+        };
+    </script>
+</body>
+</html>

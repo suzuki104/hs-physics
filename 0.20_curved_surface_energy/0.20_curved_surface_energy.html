@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>曲面から飛び出す物体の運動</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        canvas {
+            background-color: #ffffff;
+            /* touch-action: none; を削除してスクロールを可能に */
+        }
+        /* ラジオボタンをボタンのように見せるスタイル */
+        .angle-option:checked + label {
+            background-color: #3b82f6;
+            color: white;
+            border-color: #3b82f6;
+        }
+    </style>
+</head>
+<body class="bg-slate-100 min-h-screen flex flex-col items-center p-2 sm:p-4">
+
+    <div class="max-w-4xl w-full bg-white rounded-xl shadow-lg overflow-hidden">
+        <div class="p-4 bg-slate-800 text-white flex flex-col sm:flex-row justify-between items-center gap-3">
+            <h1 class="text-lg sm:text-xl font-bold text-center sm:text-left leading-tight">曲面から飛び出す物体の運動</h1>
+            <div class="flex flex-wrap justify-center gap-2">
+                <button id="resetBtn" class="bg-blue-500 hover:bg-blue-600 px-3 py-1 rounded transition text-xs sm:text-sm">リセット</button>
+                <button id="stopAtTopBtn" class="min-w-[120px] bg-slate-600 hover:bg-slate-700 px-3 py-1 rounded transition text-xs sm:text-sm">最高点で停止: OFF</button>
+                <button id="startBtn" class="min-w-[80px] bg-green-500 hover:bg-green-600 px-3 py-1 rounded transition text-xs sm:text-sm text-center">スタート</button>
+            </div>
+        </div>
+
+        <div class="relative border-b border-slate-200">
+            <!-- 高さをスマホ向けに動的調整 -->
+            <canvas id="canvas" class="w-full h-[300px] md:h-[450px]"></canvas>
+            
+            <div id="status" class="absolute top-2 right-2 pointer-events-none font-mono text-[10px] sm:text-xs bg-white/90 p-2 rounded shadow-sm border border-slate-300">
+                速度: <span id="valV">0.00</span> m/s<br>
+                状態: <span id="valState">準備完了</span>
+            </div>
+            
+            <div id="guideLine" class="absolute pointer-events-none border-t border-dashed border-slate-400 w-full" style="display: block;"></div>
+        </div>
+
+        <div class="p-4 sm:p-6 grid grid-cols-1 md:grid-cols-2 gap-6 bg-slate-50">
+            <div>
+                <div class="mb-2 text-sm font-medium text-slate-700">表示設定</div>
+                <div class="space-y-3">
+                    <div class="flex items-center">
+                        <input type="checkbox" id="traceCheck" checked class="w-4 h-4 text-blue-600 rounded">
+                        <label for="traceCheck" class="ml-2 text-sm text-slate-700">中心の軌跡を表示</label>
+                    </div>
+                    <div class="flex items-center">
+                        <input type="checkbox" id="slowCheck" class="w-4 h-4 text-blue-600 rounded">
+                        <label for="slowCheck" class="ml-2 text-sm text-slate-700">スロー再生 (1/4倍速)</label>
+                    </div>
+                </div>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-slate-700 mb-2">ジャンプ開始の高さ:</label>
+                <div class="flex space-x-2">
+                    <input type="radio" name="angle" id="angle60" value="45" class="hidden angle-option">
+                    <label for="angle60" class="flex-1 text-center py-2 border rounded-md cursor-pointer hover:bg-slate-100 transition text-sm font-medium">小</label>
+
+                    <input type="radio" name="angle" id="angle45" value="30" class="hidden angle-option" checked>
+                    <label for="angle45" class="flex-1 text-center py-2 border rounded-md cursor-pointer hover:bg-slate-100 transition text-sm font-medium">中</label>
+
+                    <input type="radio" name="angle" id="angle30" value="0" class="hidden angle-option">
+                    <label for="angle30" class="flex-1 text-center py-2 border rounded-md cursor-pointer hover:bg-slate-100 transition text-sm font-medium">大</label>
+                </div>
+            </div>
+        </div>
+        
+        <div class="p-6 border-t border-slate-100 flex flex-col items-center space-y-4">
+            <div class="flex space-x-4">
+                <!--//20260810
+                <a href="../6.0_home/home.html" class="bg-slate-600 hover:bg-slate-700 text-white px-4 py-2 rounded-lg transition text-xs sm:text-sm font-medium">ホーム</a>
+                <a href="../6.1_physics_home/physics_home.html" class="bg-slate-600 hover:bg-slate-700 text-white px-4 py-2 rounded-lg transition text-xs sm:text-sm font-medium">物理一覧</a>
+            //20260810--></div>
+            <p class="text-[10px] text-slate-400">
+                Copyright &copy; 2021-<span id="currentYear"></span> T.Suzuki
+            </p>
+        </div>
+    </div>
+
+    <script>
+        document.getElementById('currentYear').textContent = new Date().getFullYear();
+
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        const startBtn = document.getElementById('startBtn');
+        const resetBtn = document.getElementById('resetBtn');
+        const stopAtTopBtn = document.getElementById('stopAtTopBtn');
+        const traceCheck = document.getElementById('traceCheck');
+        const slowCheck = document.getElementById('slowCheck');
+        const guideLine = document.getElementById('guideLine');
+        const angleRadios = document.querySelectorAll('input[name="angle"]');
+
+        let animationId;
+        let isRunning = false;
+        let stopAtTopActive = false;
+        let pixelsPerMeter = 100; 
+        let dt = 1/60;
+
+        let config = {
+            g: 9.8,
+            R: 160, // スマホで見切れないよう半径を少し小さく調整
+            v0: 0, 
+            originX: 0,
+            originY: 0,
+            startTheta: Math.PI, 
+            endTheta: 0    
+        };
+
+        let ball = {
+            x: 0, y: 0, 
+            r: 12, // ボールサイズも微調整
+            v: 0,
+            vx: 0, vy: 0,
+            theta: 0,
+            omega: 0, 
+            mode: 'curve'
+        };
+
+        let trace = [];
+
+        function resize() {
+            canvas.width = canvas.clientWidth;
+            canvas.height = canvas.clientHeight;
+            // 画面幅に応じて半径を調整
+            if (canvas.width < 500) {
+                config.R = canvas.width * 0.4;
+                pixelsPerMeter = 80;
+            } else {
+                config.R = 180;
+                pixelsPerMeter = 100;
+            }
+            updateOrigin();
+        }
+
+        function updateOrigin() {
+            // 中心位置を調整して左右の余裕を持たせる
+            config.originX = canvas.width * 0.45;
+            config.originY = canvas.height * 0.35;
+        }
+
+        function getSelectedAngle() {
+            let selected = "30";
+            angleRadios.forEach(radio => {
+                if(radio.checked) selected = radio.value;
+            });
+            return parseFloat(selected);
+        }
+
+        function reset() {
+            isRunning = false;
+            startBtn.innerText = "スタート";
+            startBtn.className = "min-w-[80px] bg-green-500 hover:bg-green-600 px-3 py-1 rounded transition text-xs sm:text-sm text-center";
+            
+            config.v0 = 0;
+            config.endTheta = getSelectedAngle() * (Math.PI / 180);
+            
+            updateOrigin();
+            
+            ball.mode = 'curve';
+            ball.theta = config.startTheta;
+            ball.omega = config.v0 / (config.R / pixelsPerMeter);
+            ball.v = config.v0;
+            ball.vx = 0;
+            ball.vy = 0;
+            
+            trace = [];
+            updatePosition();
+            
+            guideLine.style.top = ball.y + "px";
+
+            draw();
+            document.getElementById('valState').innerText = "準備完了";
+            document.getElementById('valV').innerText = ball.v.toFixed(2);
+            cancelAnimationFrame(animationId);
+        }
+
+        function updatePosition() {
+            if (ball.mode === 'curve') {
+                const effectiveR = config.R - ball.r;
+                ball.x = config.originX + effectiveR * Math.cos(ball.theta);
+                ball.y = config.originY + effectiveR * Math.sin(ball.theta);
+            }
+        }
+
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            ctx.beginPath();
+            ctx.moveTo(config.originX + config.R * Math.cos(config.startTheta), canvas.height);
+            ctx.lineTo(config.originX + config.R * Math.cos(config.startTheta), config.originY + config.R * Math.sin(config.startTheta));
+            ctx.arc(config.originX, config.originY, config.R, config.startTheta, config.endTheta, true);
+            ctx.lineTo(config.originX + config.R * Math.cos(config.endTheta), canvas.height);
+            ctx.closePath();
+            ctx.fillStyle = '#f1f5f9'; 
+            ctx.fill();
+
+            ctx.beginPath();
+            ctx.moveTo(config.originX + config.R * Math.cos(config.startTheta), canvas.height);
+            ctx.lineTo(config.originX + config.R * Math.cos(config.startTheta), config.originY + config.R * Math.sin(config.startTheta));
+            ctx.arc(config.originX, config.originY, config.R, config.startTheta, config.endTheta, true);
+            ctx.lineTo(config.originX + config.R * Math.cos(config.endTheta), canvas.height);
+            ctx.strokeStyle = '#94a3b8'; 
+            ctx.lineWidth = 3;
+            ctx.lineCap = 'round';
+            ctx.stroke();
+
+            if (traceCheck.checked && trace.length > 1) {
+                ctx.beginPath();
+                ctx.moveTo(trace[0].x, trace[0].y);
+                for (let i = 1; i < trace.length; i++) {
+                    ctx.lineTo(trace[i].x, trace[i].y);
+                }
+                ctx.strokeStyle = 'rgba(244, 63, 94, 0.8)';
+                ctx.lineWidth = 2;
+                ctx.setLineDash([]);
+                ctx.stroke();
+            }
+
+            const ballGrad = ctx.createRadialGradient(ball.x - ball.r * 0.3, ball.y - ball.r * 0.3, ball.r * 0.1, ball.x, ball.y, ball.r);
+            ballGrad.addColorStop(0, '#fdfcf0');
+            ballGrad.addColorStop(0.4, '#e5e7eb');
+            ballGrad.addColorStop(1, '#6b7280');
+
+            ctx.beginPath();
+            ctx.arc(ball.x, ball.y, ball.r, 0, Math.PI * 2);
+            ctx.fillStyle = ballGrad;
+            ctx.fill();
+            ctx.strokeStyle = '#374151';
+            ctx.lineWidth = 1;
+            ctx.stroke();
+        }
+
+        function update() {
+            if (!isRunning) return;
+
+            let currentDt = slowCheck.checked ? dt / 4 : dt;
+
+            if (ball.mode === 'curve') {
+                const effectiveR_m = (config.R - ball.r) / pixelsPerMeter;
+                const at = config.g * Math.cos(ball.theta);
+                const alpha = at / effectiveR_m;
+                
+                ball.omega -= alpha * currentDt;
+                ball.theta -= ball.omega * currentDt;
+                ball.v = ball.omega * effectiveR_m;
+
+                updatePosition();
+
+                if (stopAtTopActive) {
+                    if (ball.theta >= config.startTheta && ball.omega < 0) {
+                        ball.theta = config.startTheta;
+                        ball.omega = 0;
+                        ball.v = 0;
+                        updatePosition();
+                        isRunning = false;
+                        startBtn.innerText = "再開";
+                        startBtn.className = "min-w-[80px] bg-green-500 hover:bg-green-600 px-3 py-1 rounded transition text-xs sm:text-sm text-center";
+                        document.getElementById('valState').innerText = "最高点";
+                        document.getElementById('valV').innerText = "0.00";
+                        return;
+                    }
+                }
+
+                if (ball.theta <= config.endTheta) {
+                    if (Math.abs(Math.PI - config.startTheta - config.endTheta) < 0.05 || config.endTheta >= Math.PI) {
+                        ball.theta = config.endTheta;
+                        ball.omega = -ball.omega; 
+                        updatePosition();
+                        
+                        if (stopAtTopActive) {
+                            isRunning = false;
+                            ball.v = 0;
+                            startBtn.innerText = "再開";
+                            startBtn.className = "min-w-[80px] bg-green-500 hover:bg-green-600 px-3 py-1 rounded transition text-xs sm:text-sm text-center";
+                            document.getElementById('valState').innerText = "最高点";
+                            document.getElementById('valV').innerText = "0.00";
+                        } else {
+                            document.getElementById('valState').innerText = "最高点";
+                        }
+                    } else {
+                        ball.mode = 'air';
+                        ball.theta = config.endTheta;
+                        updatePosition();
+                        
+                        const launchAngle = ball.theta - Math.PI / 2;
+                        ball.vx = ball.v * Math.cos(launchAngle);
+                        ball.vy = ball.v * Math.sin(launchAngle);
+                        
+                        document.getElementById('valState').innerText = "放物運動";
+                    }
+                } else if (ball.theta > config.startTheta + 0.01 && ball.omega < 0) {
+                    ball.omega = 0;
+                    ball.v = 0;
+                    ball.theta = config.startTheta;
+                    updatePosition();
+                    isRunning = false;
+                    document.getElementById('valState').innerText = "停止";
+                } else {
+                    document.getElementById('valState').innerText = "滑走中";
+                }
+            } else {
+                const nextVx = ball.vx;
+                const nextVy = ball.vy + config.g * currentDt;
+                const nextX = ball.x + nextVx * pixelsPerMeter * currentDt;
+                const nextY = ball.y + nextVy * pixelsPerMeter * currentDt;
+
+                const dx = nextX - config.originX;
+                const dy = nextY - config.originY;
+                const distToOrigin = Math.sqrt(dx*dx + dy*dy);
+                const effectiveR = config.R - ball.r;
+
+                if (distToOrigin <= effectiveR) {
+                    const angleToOrigin = Math.atan2(dy, dx);
+                    if (angleToOrigin >= config.endTheta && angleToOrigin <= config.startTheta) {
+                        ball.mode = 'curve';
+                        ball.theta = angleToOrigin;
+                        const tx = -Math.sin(ball.theta);
+                        const ty = Math.cos(ball.theta);
+                        const vt = nextVx * tx + (nextVy) * ty;
+                        const effectiveR_m = effectiveR / pixelsPerMeter;
+                        ball.omega = vt / effectiveR_m;
+                        ball.v = vt;
+                        updatePosition(); 
+                        document.getElementById('valState').innerText = "再突入";
+                    } else {
+                        ball.x = nextX;
+                        ball.vy = nextVy;
+                        ball.y = nextY;
+                        ball.v = Math.sqrt(ball.vx**2 + ball.vy**2);
+                    }
+                } else {
+                    ball.x = nextX;
+                    ball.vy = nextVy;
+                    ball.y = nextY;
+                    ball.v = Math.sqrt(ball.vx**2 + ball.vy**2);
+                }
+
+                if (stopAtTopActive && (nextVy - config.g * currentDt) < 0 && nextVy >= 0) {
+                    isRunning = false;
+                    ball.v = 0; 
+                    startBtn.innerText = "再開";
+                    startBtn.className = "min-w-[80px] bg-green-500 hover:bg-green-600 px-3 py-1 rounded transition text-xs sm:text-sm text-center";
+                    document.getElementById('valState').innerText = "最高点";
+                    document.getElementById('valV').innerText = "0.00";
+                }
+
+                if (ball.y > canvas.height + 50 || ball.x < -100 || ball.x > canvas.width + 100) {
+                    isRunning = false;
+                    document.getElementById('valState').innerText = "終了";
+                }
+            }
+
+            if (!isRunning) {
+                const state = document.getElementById('valState').innerText;
+                if (state === "終了" || state === "停止") {
+                    startBtn.innerText = "最初から開始";
+                    startBtn.className = "min-w-[80px] bg-blue-500 hover:bg-blue-600 px-3 py-1 rounded transition text-[10px] sm:text-xs text-center";
+                }
+            }
+
+            trace.push({x: ball.x, y: ball.y});
+            
+            if (isRunning) {
+                document.getElementById('valV').innerText = Math.abs(ball.v).toFixed(2);
+            }
+        }
+
+        function loop() {
+            update();
+            draw();
+            if (isRunning) {
+                animationId = requestAnimationFrame(loop);
+            }
+        }
+
+        stopAtTopBtn.addEventListener('click', () => {
+            stopAtTopActive = !stopAtTopActive;
+            if (stopAtTopActive) {
+                stopAtTopBtn.innerText = "最高点で停止: ON";
+                stopAtTopBtn.className = "min-w-[120px] bg-blue-600 hover:bg-blue-700 px-3 py-1 rounded transition text-xs sm:text-sm";
+            } else {
+                stopAtTopBtn.innerText = "最高点で停止: OFF";
+                stopAtTopBtn.className = "min-w-[120px] bg-slate-600 hover:bg-slate-700 px-3 py-1 rounded transition text-xs sm:text-sm";
+            }
+        });
+
+        startBtn.addEventListener('click', () => {
+            if (isRunning) {
+                isRunning = false;
+                startBtn.innerText = "再開";
+                startBtn.className = "min-w-[80px] bg-green-500 hover:bg-green-600 px-3 py-1 rounded transition text-xs sm:text-sm text-center";
+                cancelAnimationFrame(animationId);
+            } else {
+                const state = document.getElementById('valState').innerText;
+                if (state === "終了" || state === "停止" || state === "最初から開始") {
+                    reset();
+                }
+                isRunning = true;
+                startBtn.innerText = "一時停止";
+                startBtn.className = "min-w-[80px] bg-yellow-500 hover:bg-yellow-600 px-3 py-1 rounded transition text-xs sm:text-sm text-center";
+                loop();
+            }
+        });
+
+        resetBtn.addEventListener('click', reset);
+
+        angleRadios.forEach(radio => {
+            radio.addEventListener('change', reset);
+        });
+
+        window.addEventListener('resize', () => {
+            resize();
+            reset();
+        });
+
+        resize();
+        reset();
+    </script>
+</body>
+</html>

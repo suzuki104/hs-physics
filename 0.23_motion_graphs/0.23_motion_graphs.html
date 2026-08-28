@@ -1,0 +1,462 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>物体の運動とv-tグラフ／x-tグラフ</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        canvas {
+            background-color: #f8fafc;
+            border-bottom: 2px solid #cbd5e1;
+        }
+        .control-btn {
+            user-select: none;
+            -webkit-user-select: none;
+        }
+        .grid-container {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+        }
+        .grid-line {
+            position: absolute;
+            height: 100%;
+            width: 1px;
+            background-color: #cbd5e1;
+            display: flex;
+            align-items: flex-end;
+            padding-bottom: 4px;
+            font-size: 9px;
+            color: #94a3b8;
+        }
+        /* 数式用スタイル */
+        .math {
+            font-family: "Times New Roman", Times, serif;
+            font-style: italic;
+        }
+        /* ベクトル矢印のコンテナ */
+        #vector-display {
+            position: absolute;
+            bottom: 40px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            pointer-events: none;
+            z-index: 20;
+        }
+    </style>
+</head>
+<body class="bg-slate-50 min-h-screen p-4 font-sans text-slate-800 flex flex-col items-center">
+
+    <div class="max-w-5xl w-full bg-white rounded-xl shadow-lg overflow-hidden mb-8">
+        <header class="bg-indigo-700 text-white p-4">
+            <h1 class="text-xl font-bold">物体の運動とv-tグラフ／x-tグラフ</h1>
+            「正の加速度」「負の加速度」を長押ししている間は、物体は一定の加速度で運動します。
+        </header>
+
+        <!-- 操作エリア -->
+        <div class="p-4 bg-slate-50 border-b flex flex-col items-center gap-4">
+            
+            <!-- 1段目：初速度スライダー -->
+            <div class="w-full flex justify-center">
+                <div class="flex items-center gap-2 bg-white px-4 py-2 rounded-full shadow-sm border w-full max-w-md">
+                    <span class="text-xs font-bold text-slate-600 whitespace-nowrap">初速度 <span class="math">v₀</span>:</span>
+                    <input type="range" id="inputV0" min="-10" max="10" step="1" value="0" class="flex-grow h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer">
+                    <span id="displayV0" class="text-sm font-mono w-14 text-center whitespace-nowrap">0 m/s</span>
+                </div>
+            </div>
+
+            <!-- 2段目：スタート・リセットボタン -->
+            <div class="flex gap-4 w-full justify-center">
+                <button id="btnStartStop" class="px-8 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-full text-sm font-bold shadow-sm transition-colors w-32 text-center whitespace-nowrap">
+                    スタート
+                </button>
+                <button id="btnReset" class="px-8 py-2 bg-slate-200 hover:bg-slate-300 rounded-full text-slate-600 text-sm font-bold transition-colors w-32 text-center whitespace-nowrap">
+                    リセット
+                </button>
+            </div>
+            
+            <!-- 3段目：加速ボタン -->
+            <div class="flex justify-center gap-4 w-full">
+                <button id="btnLeft" class="control-btn flex-1 max-w-[160px] h-16 bg-rose-500 hover:bg-rose-600 active:bg-rose-700 text-white rounded-xl font-bold shadow-md transition-all transform active:scale-95 flex flex-col items-center justify-center">
+                    <span class="text-xl">←</span>
+                    <span class="text-[10px] sm:text-xs">負の加速度</span>
+                </button>
+                <button id="btnRight" class="control-btn flex-1 max-w-[160px] h-16 bg-emerald-500 hover:bg-emerald-600 active:bg-emerald-700 text-white rounded-xl font-bold shadow-md transition-all transform active:scale-95 flex flex-col items-center justify-center">
+                    <span class="text-xl">→</span>
+                    <span class="text-[10px] sm:text-xs">正の加速度</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- 運動アニメーションエリア -->
+        <div class="relative p-0 border-b">
+            <div id="viewPort" class="relative h-44 w-full bg-slate-100 overflow-hidden">
+                <div id="gridContainer" class="grid-container"></div>
+                <div class="absolute bottom-8 w-full border-b border-slate-300 border-dashed"></div>
+                
+                <!-- 物体とベクトル表示 -->
+                <div id="object-container" class="absolute bottom-8 left-1/2 -translate-x-1/2 z-10">
+                    <!-- 速度ベクトル（常時表示） -->
+                    <div id="vector-display">
+                        <div id="vector-text" class="text-[10px] font-bold text-indigo-600 whitespace-nowrap mb-1">0 m/s</div>
+                        <!-- SVG幅を500に拡大 -->
+                        <svg id="vector-svg" width="500" height="20" viewBox="0 0 500 20">
+                            <!-- 加速度と同じ形式の先端（パス）を定義 -->
+                            <g id="vector-head-right" class="hidden">
+                                <path d="M-5 -5 l5 5 l-5 5" fill="none" stroke="#4f46e5" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" />
+                            </g>
+                            <g id="vector-head-left" class="hidden">
+                                <path d="M5 -5 l-5 5 l5 5" fill="none" stroke="#4f46e5" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" />
+                            </g>
+                            <!-- 中心を250に変更 -->
+                            <line id="vector-line" x1="250" y1="10" x2="250" y2="10" stroke="#4f46e5" stroke-width="3" stroke-linecap="round" />
+                        </svg>
+                    </div>
+                    
+                    <!-- 物体本体 -->
+                    <div id="object" class="w-6 h-6 bg-indigo-600 rounded shadow-md flex items-center justify-center text-white font-bold mx-auto">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" class="w-4 h-4">
+                            <path d="M5 12h14M12 5l7 7-7 7" id="arrowRight" class="hidden" />
+                            <path d="M19 12H5M12 19l-7-7 7-7" id="arrowLeft" class="hidden" />
+                            <circle cx="12" cy="12" r="2" id="dot" />
+                        </svg>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- リアルタイムデータ -->
+        <div class="flex justify-around bg-slate-800 text-white py-2 text-[10px] sm:text-xs font-mono tracking-wider">
+            <div>位置 <span class="math">x</span>: <span id="valX" class="text-yellow-400">0.00</span> m</div>
+            <div>速度 <span class="math">v</span>: <span id="valV" class="text-cyan-400">0.00</span> m/s</div>
+            <div>加速度 <span class="math">a</span>: <span id="valA" class="text-rose-400">0.00</span> m/s²</div>
+        </div>
+
+        <!-- グラフエリア -->
+        <div class="grid grid-cols-2 gap-0 border-b">
+            <div class="p-2 sm:p-4 border-r border-slate-100">
+                <h2 class="text-[12px] sm:text-base font-bold text-slate-500 mb-1 lowercase text-center"><span class="math">v-t</span>グラフ</h2>
+                <canvas id="vtGraph" class="w-full h-32 sm:h-48 rounded-lg"></canvas>
+            </div>
+            <div class="p-2 sm:p-4">
+                <h2 class="text-[12px] sm:text-base font-bold text-slate-500 mb-1 lowercase text-center"><span class="math">x-t</span>グラフ</h2>
+                <canvas id="xtGraph" class="w-full h-32 sm:h-48 rounded-lg"></canvas>
+            </div>
+        </div>
+
+        <div class="h-4 bg-slate-50"></div>
+    </div>
+
+    <!-- ナビゲーションボタン -->
+    <!-- //20260810 
+    <div class="flex gap-4 mb-6">
+        <a href="../6.0_home/home.html" class="px-6 py-2 bg-slate-700 hover:bg-slate-800 text-white rounded-lg text-sm font-medium transition-colors">ホーム</a>
+        <a href="../6.1_physics_home/physics_home.html" class="px-6 py-2 bg-slate-700 hover:bg-slate-800 text-white rounded-lg text-sm font-medium transition-colors">物理一覧</a>
+    </div> //20260810 -->
+
+    <!-- コピーライト -->
+    <footer class="text-slate-400 text-[11px] pb-8">
+        Copyright &copy; 2021-<span id="copyYear"></span> T.Suzuki
+    </footer>
+
+    <script>
+        const ACCEL_VAL = 2.0; 
+        const DT = 0.016; 
+        const PIXELS_PER_METER = 20;
+
+        let x = 0;      
+        let v = 0;      
+        let a = 0;      
+        let prevA = 0; 
+        let currentTime = 0; 
+        let history = []; 
+        let isRightPressed = false;
+        let isLeftPressed = false;
+        let isRunning = false; 
+
+        const obj = document.getElementById('object');
+        const arrowR = document.getElementById('arrowRight');
+        const arrowL = document.getElementById('arrowLeft');
+        const dot = document.getElementById('dot');
+        const gridContainer = document.getElementById('gridContainer');
+        const btnStartStop = document.getElementById('btnStartStop');
+        const copyYear = document.getElementById('copyYear');
+        const inputV0 = document.getElementById('inputV0');
+        const displayV0 = document.getElementById('displayV0');
+        
+        const vectorText = document.getElementById('vector-text');
+        const vectorLine = document.getElementById('vector-line');
+        const vectorHeadRight = document.getElementById('vector-head-right');
+        const vectorHeadLeft = document.getElementById('vector-head-left');
+
+        const xtCanvas = document.getElementById('xtGraph');
+        const vtCanvas = document.getElementById('vtGraph');
+        const xtCtx = xtCanvas.getContext('2d');
+        const vtCtx = vtCanvas.getContext('2d');
+        
+        const valX = document.getElementById('valX');
+        const valV = document.getElementById('valV');
+        const valA = document.getElementById('valA');
+
+        copyYear.innerText = new Date().getFullYear();
+
+        function updateVectorUI(velocity) {
+            const centerX = 250; // SVGの中心座標 (500/2)
+            const absV = Math.abs(velocity);
+            
+            if (absV < 0.01) {
+                vectorLine.setAttribute('x2', centerX);
+                vectorText.innerText = "0.00 m/s";
+                vectorLine.setAttribute('stroke-opacity', '0.2');
+                vectorHeadRight.classList.add('hidden');
+                vectorHeadLeft.classList.add('hidden');
+                return;
+            }
+            
+            vectorLine.setAttribute('stroke-opacity', '1');
+            const scale = 5; 
+            
+            // 低速時に根本と先が重ならないよう、表示上の最小長さを担保
+            let displayV = velocity;
+            if (absV < 1.5) {
+                displayV = (velocity > 0 ? 1.5 : -1.5);
+            }
+            
+            const length = displayV * scale;
+            const endX = centerX + length;
+            vectorLine.setAttribute('x2', endX);
+            vectorText.innerText = velocity.toFixed(2) + " m/s";
+
+            // 先端の表示更新（加速度インジケーターと同じ形式）
+            if (velocity > 0) {
+                vectorHeadRight.classList.remove('hidden');
+                vectorHeadLeft.classList.add('hidden');
+                vectorHeadRight.setAttribute('transform', `translate(${endX}, 10)`);
+            } else {
+                vectorHeadLeft.classList.remove('hidden');
+                vectorHeadRight.classList.add('hidden');
+                vectorHeadLeft.setAttribute('transform', `translate(${endX}, 10)`);
+            }
+        }
+
+        inputV0.addEventListener('input', (e) => {
+            const val = parseFloat(e.target.value);
+            displayV0.innerText = val + " m/s";
+            if (!isRunning && history.length === 0) {
+                v = val;
+                valV.innerText = v.toFixed(2);
+                updateVectorUI(v);
+            }
+        });
+
+        function resize() {
+            xtCanvas.width = xtCanvas.clientWidth;
+            xtCanvas.height = xtCanvas.clientHeight;
+            vtCanvas.width = vtCanvas.clientWidth;
+            vtCanvas.height = vtCanvas.clientHeight;
+            
+            if (history.length > 0) {
+                drawGraph(vtCtx, vtCanvas, history, 'v', '#06b6d4');
+                drawGraph(xtCtx, xtCanvas, history, 'x', '#6366f1');
+            }
+        }
+
+        window.addEventListener('resize', resize);
+        resize();
+
+        function updateGrid(currentX) {
+            gridContainer.innerHTML = '';
+            const viewWidth = gridContainer.clientWidth;
+            const halfWidth = viewWidth / 2;
+            const startM = Math.floor(currentX - halfWidth / PIXELS_PER_METER) - 1;
+            const endM = Math.ceil(currentX + halfWidth / PIXELS_PER_METER) + 1;
+            
+            for (let m = startM; m <= endM; m++) {
+                if (m % 5 === 0) {
+                    const line = document.createElement('div');
+                    line.className = 'grid-line';
+                    if (m % 10 === 0) line.style.backgroundColor = '#94a3b8';
+                    const leftPos = halfWidth + (m - currentX) * PIXELS_PER_METER;
+                    line.style.left = `${leftPos}px`;
+                    line.innerHTML = `<span class="ml-1">${m}m</span>`;
+                    gridContainer.appendChild(line);
+                }
+            }
+        }
+
+        const setRight = (val) => isRightPressed = val;
+        const setLeft = (val) => isLeftPressed = val;
+
+        document.getElementById('btnRight').addEventListener('mousedown', () => setRight(true));
+        document.getElementById('btnRight').addEventListener('touchstart', (e) => { e.preventDefault(); setRight(true); });
+        document.getElementById('btnLeft').addEventListener('mousedown', () => setLeft(true));
+        document.getElementById('btnLeft').addEventListener('touchstart', (e) => { e.preventDefault(); setLeft(true); });
+
+        window.addEventListener('mouseup', () => { setRight(false); setLeft(false); });
+        window.addEventListener('touchend', () => { setRight(false); setLeft(false); });
+
+        btnStartStop.addEventListener('click', () => {
+            if (!isRunning && history.length === 0) {
+                v = parseFloat(inputV0.value);
+            }
+            isRunning = !isRunning;
+            btnStartStop.innerText = isRunning ? 'ストップ' : 'スタート';
+            btnStartStop.classList.toggle('bg-indigo-600', !isRunning);
+            btnStartStop.classList.toggle('bg-amber-600', isRunning);
+            inputV0.disabled = isRunning || history.length > 0;
+        });
+
+        document.getElementById('btnReset').addEventListener('click', () => {
+            x = 0; 
+            v = parseFloat(inputV0.value); 
+            a = 0; 
+            prevA = 0; 
+            currentTime = 0;
+            history = [];
+            isRunning = false;
+            btnStartStop.innerText = 'スタート';
+            btnStartStop.classList.add('bg-indigo-600');
+            btnStartStop.classList.remove('bg-amber-600');
+            inputV0.disabled = false;
+            
+            updateVectorUI(v);
+            updateGrid(0);
+            valX.innerText = "0.00";
+            valV.innerText = v.toFixed(2);
+            valA.innerText = "0.00";
+            
+            xtCtx.clearRect(0, 0, xtCanvas.width, xtCanvas.height);
+            vtCtx.clearRect(0, 0, vtCanvas.width, vtCanvas.height);
+        });
+
+        function drawGraph(ctx, canvas, data, key, color) {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            const padding = 20; 
+            const w = canvas.width - padding * 2;
+            const h = canvas.height - padding * 2;
+
+            // 枠線と軸の描画（黒色に変更）
+            ctx.strokeStyle = '#000000';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.moveTo(padding, padding);
+            ctx.lineTo(padding, canvas.height - padding); // 縦軸
+            ctx.lineTo(canvas.width - padding, canvas.height - padding); // 横軸
+            ctx.stroke();
+
+            // 軸ラベルの描画（黒色に変更）
+            ctx.fillStyle = '#000000';
+            ctx.font = 'italic 12px serif';
+            ctx.textAlign = 'right';
+            ctx.fillText('t', canvas.width - 5, canvas.height - padding + 15);
+            ctx.textAlign = 'left';
+            ctx.fillText(key, 5, padding - 5);
+
+            if (data.length < 2) return;
+
+            let vals = data.map(d => d[key]);
+            let minVal = Math.min(...vals, 0);
+            let maxVal = Math.max(...vals, 0);
+            let buffer = Math.abs(maxVal - minVal) * 0.15 || 1;
+            minVal -= buffer;
+            maxVal += buffer;
+
+            const range = maxVal - minVal;
+
+            const zeroY = padding + h - (((0 - minVal) / range) * h);
+            if (zeroY >= padding && zeroY <= canvas.height - padding) {
+                // 0ライン点線の描画（黒色に変更）
+                ctx.strokeStyle = '#000000';
+                ctx.setLineDash([4, 4]);
+                ctx.beginPath();
+                ctx.moveTo(padding, zeroY);
+                ctx.lineTo(canvas.width - padding, zeroY);
+                ctx.stroke();
+                ctx.setLineDash([]);
+            }
+
+            ctx.strokeStyle = color;
+            ctx.lineWidth = 2;
+            ctx.lineJoin = 'round';
+            ctx.beginPath();
+            data.forEach((d, i) => {
+                const posX = padding + (i / (data.length - 1 || 1)) * w;
+                const normalizedVal = (d[key] - minVal) / range;
+                const posY = padding + h - (normalizedVal * h);
+                if (i === 0) ctx.moveTo(posX, posY);
+                else ctx.lineTo(posX, posY);
+            });
+            ctx.stroke();
+
+            // イベントマーカーと時間の表記（テキストを黒色に変更）
+            data.forEach((d, i) => {
+                if (d.isEvent) {
+                    const posX = padding + (i / (data.length - 1 || 1)) * w;
+                    const normalizedVal = (d[key] - minVal) / range;
+                    const posY = padding + h - (normalizedVal * h);
+                    
+                    ctx.fillStyle = '#f59e0b';
+                    ctx.beginPath();
+                    ctx.arc(posX, posY, 4, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.strokeStyle = '#fff';
+                    ctx.lineWidth = 1.5;
+                    ctx.stroke();
+
+                    // 時間のテキストを表示
+                    ctx.fillStyle = '#000000';
+                    ctx.font = 'bold 9px sans-serif';
+                    ctx.textAlign = 'left';
+                    ctx.fillText(`${d.t.toFixed(1)}s`, posX + 6, posY - 4);
+                }
+            });
+        }
+
+        function update() {
+            if (isRunning) {
+                if (isRightPressed) a = ACCEL_VAL;
+                else if (isLeftPressed) a = -ACCEL_VAL;
+                else a = 0;
+
+                let isEvent = (a !== prevA);
+                prevA = a;
+
+                v += a * DT;
+                x += v * DT;
+                currentTime += DT;
+
+                history.push({x, v, isEvent, t: currentTime});
+
+                valX.innerText = x.toFixed(2);
+                valV.innerText = v.toFixed(2);
+                valA.innerText = a.toFixed(2);
+                
+                updateGrid(x);
+                updateVectorUI(v);
+                
+                if (a > 0) {
+                    arrowR.classList.remove('hidden'); arrowL.classList.add('hidden'); dot.classList.add('hidden');
+                } else if (a < 0) {
+                    arrowL.classList.remove('hidden'); arrowR.classList.add('hidden'); dot.classList.add('hidden');
+                } else {
+                    arrowR.classList.add('hidden'); arrowL.classList.add('hidden'); dot.classList.remove('hidden');
+                }
+
+                drawGraph(vtCtx, vtCanvas, history, 'v', '#06b6d4');
+                drawGraph(xtCtx, xtCanvas, history, 'x', '#6366f1');
+            }
+
+            requestAnimationFrame(update);
+        }
+
+        updateGrid(0);
+        updateVectorUI(0);
+        window.onload = update;
+    </script>
+</body>
+</html>

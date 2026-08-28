@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>水平投射</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        canvas {
+            background: #f8fafc;
+            border-bottom: 2px solid #94a3b8;
+            /* touch-actionをpan-yにすることで、描画エリア上でも上下スクロールを許可 */
+            touch-action: pan-y;
+        }
+        @media (max-width: 768px) {
+            .legend-panel {
+                top: 8px !important;
+                right: 8px !important;
+                bottom: auto !important; 
+                padding: 6px;
+                font-size: 10px;
+                max-width: 130px;
+                height: auto !important;
+            }
+        }
+    </style>
+</head>
+<body class="bg-slate-100 min-h-screen flex flex-col font-sans overflow-x-hidden">
+
+    <!-- Header -->
+    <header class="bg-cyan-800 text-white p-3 md:p-4 shadow-lg shrink-0">
+        <h1 class="text-lg md:text-xl font-bold">水平投射</h1>
+    </header>
+
+    <main class="flex-grow flex flex-col md:flex-row p-2 md:p-4 gap-2 md:gap-4 overflow-hidden">
+        <!-- Canvas Area -->
+        <div class="flex-[2] flex flex-col gap-2 min-h-0">
+            <div class="bg-white rounded-xl shadow-md overflow-hidden flex flex-col relative h-[300px] md:h-[450px] shrink-0">
+                <canvas id="canvas" class="w-full h-full"></canvas>
+                
+                <!-- Legend -->
+                <div class="legend-panel absolute bottom-4 right-4 p-3 bg-white/80 text-[10px] md:text-xs rounded-lg border border-slate-200 shadow-sm z-10">
+                    <div class="flex items-center gap-2 mb-1"><span class="w-3 h-3 rounded-full bg-blue-600 shrink-0"></span> 水平投射</div>
+                    <div class="flex items-center gap-2 mb-1"><span class="w-3 h-3 rounded-full bg-emerald-500/40 shrink-0"></span> 水平：等速直線運動</div>
+                    <div class="flex items-center gap-2"><span class="w-3 h-3 rounded-full bg-rose-500/40 shrink-0"></span> 鉛直：自由落下</div>
+                </div>
+            </div>
+            
+            <!-- Stats (Moved below animation) -->
+            <div class="stats-panel p-3 bg-white rounded-xl shadow border border-slate-200 text-sm">
+                <div class="font-bold text-slate-800 mb-2 border-b pb-1 text-xs">観測データ</div>
+                <div class="flex flex-wrap gap-x-6 gap-y-1">
+                    <div>時刻: <span id="stat-t" class="font-mono font-bold">0.00</span> s</div>
+                    <div>水平速度 v<sub>x</sub>: <span id="stat-vx" class="font-mono text-emerald-600 font-bold">0.00</span> m/s</div>
+                    <div>鉛直速度 v<sub>y</sub>: <span id="stat-vy" class="font-mono text-rose-600 font-bold">0.00</span> m/s</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Controls -->
+        <div class="flex-1 w-full md:w-80 space-y-2 md:space-y-4 overflow-y-auto">
+            <div class="bg-white p-4 md:p-6 rounded-xl shadow-md space-y-4 md:space-y-6 border border-slate-200">
+                <h2 class="text-base md:text-lg font-bold text-slate-700 border-b pb-2">シミュレーション設定</h2>
+                
+                <div class="space-y-3 md:space-y-4">
+                    <!-- Height -->
+                    <div class="space-y-1">
+                        <div class="flex justify-between items-center">
+                            <label class="text-xs md:text-sm font-medium text-slate-600">初期高度 h</label>
+                            <span class="text-cyan-600 font-bold text-sm md:text-base"><span id="val-h">20</span> m</span>
+                        </div>
+                        <input type="range" id="input-h" min="5" max="40" value="20" step="1" class="w-full h-2 bg-slate-200 rounded-lg cursor-pointer accent-cyan-600">
+                    </div>
+
+                    <!-- Velocity -->
+                    <div class="space-y-1">
+                        <div class="flex justify-between items-center">
+                            <label class="text-xs md:text-sm font-medium text-slate-600">水平初速度 v<sub>0</sub></label>
+                            <span class="text-cyan-600 font-bold text-sm md:text-base"><span id="val-v0">10</span> m/s</span>
+                        </div>
+                        <input type="range" id="input-v0" min="0" max="30" value="10" step="1" class="w-full h-2 bg-slate-200 rounded-lg cursor-pointer accent-cyan-600">
+                    </div>
+
+                    <!-- Strobe Interval -->
+                    <div class="space-y-1">
+                        <div class="flex justify-between items-center">
+                            <label class="text-xs md:text-sm font-medium text-slate-600">ストロボ間隔</label>
+                            <span class="text-cyan-600 font-bold text-sm md:text-base"><span id="val-strobe">0.4</span> s</span>
+                        </div>
+                        <input type="range" id="input-strobe" min="0.1" max="1.0" value="0.4" step="0.1" class="w-full h-2 bg-slate-200 rounded-lg cursor-pointer accent-cyan-600">
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-2">
+                    <button id="btn-start" class="bg-cyan-600 hover:bg-cyan-700 text-white font-bold py-3 md:py-4 rounded-lg transition shadow-md active:scale-95">投射！</button>
+                    <button id="btn-clear" class="bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-3 md:py-4 rounded-lg transition active:scale-95">リセット</button>
+                </div>
+
+                <div class="pt-2 border-t space-y-2">
+                    <label class="flex items-center space-x-3 cursor-pointer py-1">
+                        <input type="checkbox" id="check-decompose" checked class="w-5 h-5 text-cyan-600 rounded">
+                        <span class="text-xs md:text-sm text-slate-700 font-bold">運動の分解を表示</span>
+                    </label>
+                    <div class="ml-8 space-y-2">
+                        <label class="flex items-center space-x-3 cursor-pointer">
+                            <input type="checkbox" id="check-strobe-lines" checked class="w-4 h-4 text-cyan-400 rounded">
+                            <span class="text-[10px] md:text-xs text-slate-600 italic">残像の補助線も表示</span>
+                        </label>
+                    </div>
+                    <label class="flex items-center space-x-3 cursor-pointer py-1">
+                        <input type="checkbox" id="check-strobe" checked class="w-5 h-5 text-cyan-600 rounded">
+                        <span class="text-xs md:text-sm text-slate-700">ストロボ（残像）を表示</span>
+                    </label>
+                </div>
+            </div>
+
+            <div class="bg-cyan-50 p-3 md:p-4 rounded-xl border border-cyan-100 text-[10px] md:text-xs text-cyan-900 leading-relaxed">
+                水平投射されたボールは、<br>
+                1. <span class="text-emerald-700 font-bold">水平方向</span>：初速度のまま進み続ける（等速直線運動）<br>
+                2. <span class="text-rose-700 font-bold">鉛直方向</span>：静かに落とした場合と同じ（自由落下）<br>
+                この2つの運動を合成したものが水平投射です。初速度を変えても、地面に落ちるまでの時間は変わりません。
+            </div>
+        </div>
+    </main>
+
+    <!-- Footer Buttons & Copyright -->
+    <footer class="p-4 space-y-4 shrink-0">
+        <div class="flex justify-center gap-4"> <!-- //20260810 
+            <a href="../6.0_home/home.html" class="bg-slate-700 hover:bg-slate-800 text-white font-bold py-2 px-6 rounded-full transition shadow-md active:scale-95 text-sm">ホーム</a>
+            <a href="../6.1_physics_home/physics_home.html" class="bg-slate-700 hover:bg-slate-800 text-white font-bold py-2 px-6 rounded-full transition shadow-md active:scale-95 text-sm">物理一覧</a>
+        </div> //20260810 -->
+        <div class="text-center text-slate-500 text-xs">
+            Copyright &copy; 2021-<span id="copy-year"></span> T.Suzuki
+        </div>
+    </footer>
+
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        
+        const ui = {
+            h: document.getElementById('input-h'),
+            v0: document.getElementById('input-v0'),
+            strobe: document.getElementById('input-strobe'),
+            valH: document.getElementById('val-h'),
+            valV0: document.getElementById('val-v0'),
+            valStrobe: document.getElementById('val-strobe'),
+            btnStart: document.getElementById('btn-start'),
+            btnClear: document.getElementById('btn-clear'),
+            checkDecompose: document.getElementById('check-decompose'),
+            checkStrobeLines: document.getElementById('check-strobe-lines'),
+            checkStrobe: document.getElementById('check-strobe'),
+            statT: document.getElementById('stat-t'),
+            statVx: document.getElementById('stat-vx'),
+            statVy: document.getElementById('stat-vy')
+        };
+
+        const g = 9.8;
+        let scale = 12; 
+        let startX = 60;
+        let groundY;
+        const ballRadius = 10; 
+        const strobeRadius = 8; 
+
+        let state = {
+            isRunning: false,
+            time: 0,
+            strobePoints: [],
+            lastStrobeTime: 0,
+            v0: 10,
+            h: 20,
+            strobeInterval: 0.4
+        };
+
+        function resize() {
+            // CSSで固定されたサイズを取得してCanvasの解像度を合わせる
+            const rect = canvas.getBoundingClientRect();
+            canvas.width = rect.width;
+            canvas.height = rect.height;
+            
+            // 画面サイズに応じてスケールを調整
+            if (canvas.width < 500) {
+                scale = 8;
+                startX = 40;
+            } else {
+                scale = 12;
+                startX = 60;
+            }
+            
+            groundY = canvas.height - 40;
+            draw();
+        }
+
+        function updateParams() {
+            state.h = parseFloat(ui.h.value);
+            state.v0 = parseFloat(ui.v0.value);
+            state.strobeInterval = parseFloat(ui.strobe.value);
+            ui.valH.innerText = state.h;
+            ui.valV0.innerText = state.v0;
+            ui.valStrobe.innerText = state.strobeInterval.toFixed(1);
+            if (!state.isRunning) resetSim();
+        }
+
+        function resetSim() {
+            state.time = 0;
+            state.strobePoints = [];
+            state.lastStrobeTime = 0;
+            state.isRunning = false;
+            draw();
+        }
+
+        function drawArrow(x, y, length, angleRad, color, thickness = 3) {
+            if (length < 2) return;
+            const headLength = 12; 
+            const headAngle = Math.PI / 6; 
+            const endX = x + length * Math.cos(angleRad);
+            const endY = y + length * Math.sin(angleRad); // 下向き正
+            
+            ctx.beginPath();
+            ctx.strokeStyle = color;
+            ctx.lineWidth = thickness;
+            ctx.lineCap = 'round';
+            ctx.moveTo(x, y);
+            ctx.lineTo(endX, endY);
+            ctx.stroke();
+
+            ctx.beginPath();
+            ctx.fillStyle = color;
+            ctx.moveTo(endX, endY);
+            ctx.lineTo(
+                endX - headLength * Math.cos(angleRad - headAngle), 
+                endY - headLength * Math.sin(angleRad - headAngle)
+            );
+            ctx.lineTo(
+                endX - headLength * Math.cos(angleRad + headAngle), 
+                endY - headLength * Math.sin(angleRad + headAngle)
+            );
+            ctx.closePath();
+            ctx.fill();
+        }
+
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            // 地面
+            ctx.strokeStyle = '#94a3b8';
+            ctx.lineWidth = 2;
+            ctx.beginPath(); ctx.moveTo(0, groundY); ctx.lineTo(canvas.width, groundY); ctx.stroke();
+            
+            // 壁・高さの目印
+            ctx.strokeStyle = '#cbd5e1';
+            ctx.setLineDash([2, 2]);
+            ctx.beginPath(); ctx.moveTo(startX, 0); ctx.lineTo(startX, groundY); ctx.stroke();
+            ctx.setLineDash([]);
+
+            // 目盛り
+            ctx.fillStyle = '#94a3b8';
+            ctx.font = '10px Arial';
+            for (let i = 0; i < canvas.width; i += 5 * scale) {
+                ctx.fillText(`${i/scale}m`, startX + i, groundY + 15);
+            }
+
+            const vy = g * state.time;
+            const x = state.v0 * state.time;
+            const y = 0.5 * g * state.time * state.time;
+
+            const startY = groundY - state.h * scale;
+            const px = startX + x * scale;
+            const py = startY + y * scale;
+
+            ui.statT.innerText = state.time.toFixed(2);
+            ui.statVx.innerText = state.v0.toFixed(2);
+            ui.statVy.innerText = vy.toFixed(2);
+
+            // 初速度ベクトルのプレビュー（停止時のみ）
+            if (!state.isRunning && state.time === 0) {
+                drawArrow(startX, startY, state.v0 * 4, 0, '#2563eb', 4);
+            }
+
+            // ストロボ描画
+            if (ui.checkStrobe.checked) {
+                state.strobePoints.forEach(p => {
+                    if (ui.checkDecompose.checked && ui.checkStrobeLines.checked) {
+                        ctx.setLineDash([2, 2]);
+                        ctx.strokeStyle = 'rgba(148, 163, 184, 0.2)';
+                        ctx.beginPath();
+                        ctx.moveTo(p.px, p.py); ctx.lineTo(p.px, groundY); // 水平への垂線
+                        ctx.moveTo(p.px, p.py); ctx.lineTo(startX, p.py); // 垂直への垂線
+                        ctx.stroke();
+                        ctx.setLineDash([]);
+                    }
+                    // 本体ストロボ (不透明度 0.2)
+                    ctx.fillStyle = 'rgba(37, 99, 235, 0.2)';
+                    ctx.beginPath(); ctx.arc(p.px, p.py, strobeRadius, 0, Math.PI*2); ctx.fill();
+                    
+                    if (ui.checkDecompose.checked) {
+                        // 水平方向ストロボ (不透明度をさらに下げる 0.08)
+                        ctx.fillStyle = 'rgba(16, 185, 129, 0.08)';
+                        ctx.beginPath(); ctx.arc(p.px, groundY, strobeRadius, 0, Math.PI*2); ctx.fill();
+                        // 鉛直方向ストロボ (不透明度をさらに下げる 0.08)
+                        ctx.fillStyle = 'rgba(244, 63, 94, 0.08)';
+                        ctx.beginPath(); ctx.arc(startX, p.py, strobeRadius, 0, Math.PI*2); ctx.fill();
+                    }
+                });
+            }
+
+            // 分解されたボールと補助線
+            if (ui.checkDecompose.checked) {
+                ctx.setLineDash([4, 4]);
+                ctx.strokeStyle = 'rgba(203, 213, 225, 0.4)';
+                ctx.beginPath();
+                ctx.moveTo(px, py); ctx.lineTo(px, groundY);
+                ctx.moveTo(px, py); ctx.lineTo(startX, py);
+                ctx.stroke();
+                ctx.setLineDash([]);
+
+                // 水平成分（等速） (不透明度 0.35)
+                ctx.fillStyle = 'rgba(16, 185, 129, 0.35)';
+                ctx.beginPath(); ctx.arc(px, groundY, ballRadius, 0, Math.PI*2); ctx.fill();
+                ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)'; ctx.lineWidth = 1; ctx.stroke();
+                
+                // 鉛直成分（自由落下） (不透明度 0.35)
+                ctx.fillStyle = 'rgba(244, 63, 94, 0.35)';
+                ctx.beginPath(); ctx.arc(startX, py, ballRadius, 0, Math.PI*2); ctx.fill();
+                ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)'; ctx.lineWidth = 1; ctx.stroke();
+            }
+
+            // 本体ボール (不透明度 1.0)
+            ctx.fillStyle = '#2563eb';
+            ctx.beginPath(); ctx.arc(px, py, ballRadius, 0, Math.PI*2); ctx.fill();
+            ctx.strokeStyle = 'white'; ctx.lineWidth = 2; ctx.stroke();
+
+            // 着地判定
+            if (state.isRunning && py >= groundY) {
+                state.isRunning = false;
+                // 最後に地面にピッタリ合わせる
+                state.time = Math.sqrt(2 * state.h / g);
+                draw();
+            }
+        }
+
+        function loop() {
+            if (!state.isRunning) return;
+            state.time += 0.016; // 約60fps
+            
+            const startY = groundY - state.h * scale;
+            const x = state.v0 * state.time;
+            const y = 0.5 * g * state.time * state.time;
+            const px = startX + x * scale;
+            const py = startY + y * scale;
+
+            if (state.time >= state.lastStrobeTime + state.strobeInterval) {
+                state.strobePoints.push({ px, py });
+                state.lastStrobeTime += state.strobeInterval;
+            }
+
+            draw();
+            
+            if (state.isRunning && px < canvas.width + 50) {
+                requestAnimationFrame(loop);
+            } else {
+                state.isRunning = false;
+            }
+        }
+
+        // コピーライトの年を設定
+        document.getElementById('copy-year').innerText = new Date().getFullYear();
+
+        ui.btnStart.onclick = () => {
+            resetSim();
+            state.isRunning = true;
+            const startY = groundY - state.h * scale;
+            state.strobePoints.push({ px: startX, py: startY });
+            loop();
+        };
+        ui.btnClear.onclick = resetSim;
+        ui.h.oninput = updateParams;
+        ui.v0.oninput = updateParams;
+        ui.strobe.oninput = updateParams;
+        ui.checkDecompose.onchange = draw;
+        ui.checkStrobeLines.onchange = draw;
+        ui.checkStrobe.onchange = draw;
+
+        window.addEventListener('resize', resize);
+        window.onload = resize;
+    </script>
+</body>
+</html>

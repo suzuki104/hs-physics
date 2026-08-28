@@ -1,0 +1,474 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>相対速度（一直線上）</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- MathJax for TeX rendering -->
+    <script>
+        window.MathJax = {
+            tex: {
+                inlineMath: [['$', '$'], ['\\(', '\\)']]
+            },
+            startup: {
+                pageReady: () => {
+                    return MathJax.startup.defaultPageReady().then(() => {
+                        window.mathjaxReady = true;
+                    });
+                }
+            }
+        };
+    </script>
+    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <style>
+        body {
+            background-color: #f8fafc;
+            touch-action: manipulation;
+        }
+        .canvas-container {
+            position: relative;
+            width: 100%;
+            height: 300px;
+            background: #e2e8f0;
+            border-radius: 8px;
+            overflow: hidden;
+            border: 2px solid #cbd5e1;
+        }
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+    </style>
+</head>
+<body class="p-4 md:p-8">
+    <div class="max-w-4xl mx-auto bg-white p-6 rounded-xl shadow-lg">
+        <h1 class="text-2xl font-bold text-slate-800 mb-6 border-b pb-2 text-center">相対速度（一直線上）</h1>
+        
+        <!-- 上部：設定・コントロールエリア -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-4">
+            <!-- 設定パネル -->
+            <div class="space-y-4 bg-slate-50 p-4 rounded-lg border">
+                <h2 class="font-bold text-slate-700 underline">速度の設定</h2>
+                <div class="grid grid-cols-1 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-red-600">車Aの速度 $v_A$ (m/s)</label>
+                        <input type="range" id="velA" min="-20" max="20" value="3" class="w-full h-2 bg-red-200 rounded-lg appearance-none cursor-pointer">
+                        <div class="text-center font-mono font-bold" id="valA">3 m/s</div>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-blue-600">車Bの速度 $v_B$ (m/s)</label>
+                        <input type="range" id="velB" min="-20" max="20" value="7" class="w-full h-2 bg-blue-200 rounded-lg appearance-none cursor-pointer">
+                        <div class="text-center font-mono font-bold" id="valB">7 m/s</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 視点切り替えパネル -->
+            <div class="space-y-4 bg-slate-50 p-4 rounded-lg border flex flex-col justify-center">
+                <h2 class="font-bold text-slate-700 underline mb-2">観測者の視点</h2>
+                <select id="viewSelect" class="w-full p-3 bg-white border border-slate-300 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 outline-none cursor-pointer">
+                    <option value="ground">地面から見る (静止)</option>
+                    <option value="carA">車Aから見る (Aを固定)</option>
+                    <option value="carB">車Bから見る (Bを固定)</option>
+                </select>
+            </div>
+        </div>
+
+        <!-- コントロールボタン -->
+        <div class="flex justify-end mb-2 gap-2">
+            <button id="togglePlayBtn" class="px-4 py-2 bg-indigo-600 text-white text-sm rounded hover:bg-indigo-700 transition flex items-center gap-2 shadow">
+                <span id="playIcon">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                </span>
+                <span id="playText">ストップ</span>
+            </button>
+            <button id="resetBtn" class="px-4 py-2 bg-slate-600 text-white text-sm rounded hover:bg-slate-700 transition flex items-center gap-2 shadow">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+                位置をリセット
+            </button>
+        </div>
+
+        <!-- アニメーションエリア -->
+        <div class="canvas-container shadow-inner mb-4">
+            <canvas id="physicsCanvas"></canvas>
+        </div>
+
+        <!-- 計算式エリア -->
+        <div class="bg-indigo-50 p-5 rounded-lg border border-indigo-100 mb-8 shadow-sm">
+            <h2 class="font-bold text-indigo-800 underline mb-2">現在の相対速度</h2>
+            <div class="flex flex-wrap items-center gap-x-4 gap-y-2">
+                <div id="formula" class="text-xl text-slate-700">
+                    <span id="formulaText">地面基準：それぞれの速度</span>
+                </div>
+                <div id="calculation" class="text-xl font-bold text-indigo-600 bg-white px-4 py-2 rounded border border-indigo-200 shadow-inner">
+                    A: 3 m/s | B: 7 m/s
+                </div>
+            </div>
+            <p id="descriptionText" class="text-sm text-indigo-500 mt-4 leading-relaxed italic">
+                それぞれの車が地面に対して走っている速度です。
+            </p>
+        </div>
+
+        <!-- ナビゲーションボタン -->
+        <!-- //20260810
+        <div class="flex justify-center gap-4 mb-6">
+            <a href="../6.0_home/home.html" class="px-8 py-3 bg-slate-800 text-white rounded-full hover:bg-slate-700 transition shadow-md font-bold">ホーム</a>
+            <a href="../6.1_physics_home/physics_home.html" class="px-8 py-3 bg-blue-800 text-white rounded-full hover:bg-blue-700 transition shadow-md font-bold">物理一覧</a>
+        </div> //20260810 -->
+
+        <!-- コピーライト -->
+        <div class="text-center text-slate-400 text-sm italic py-4 border-t">
+            Copyright &copy; 2021-<span id="currentYear"></span> T.Suzuki
+        </div>
+    </div>
+
+    <script>
+        document.getElementById('currentYear').textContent = new Date().getFullYear();
+
+        const canvas = document.getElementById('physicsCanvas');
+        const ctx = canvas.getContext('2d');
+        const velASlider = document.getElementById('velA');
+        const velBSlider = document.getElementById('velB');
+        const valA = document.getElementById('valA');
+        const valB = document.getElementById('valB');
+        const calcDisplay = document.getElementById('calculation');
+        const formulaDisplay = document.getElementById('formulaText');
+        const descDisplay = document.getElementById('descriptionText');
+        const viewSelect = document.getElementById('viewSelect');
+        const resetBtn = document.getElementById('resetBtn');
+        const togglePlayBtn = document.getElementById('togglePlayBtn');
+        const playIcon = document.getElementById('playIcon');
+        const playText = document.getElementById('playText');
+
+        let posA = 100;
+        let posB = 200;
+        let vA = parseInt(velASlider.value);
+        let vB = parseInt(velBSlider.value);
+        let currentView = 'ground';
+        let pixelsPerMeter = 15;
+        let lastTime = performance.now();
+        let resetTimer = null; // 自動リスタート用タイマー
+        let isPlaying = true;
+
+        function resize() {
+            canvas.width = canvas.parentElement.clientWidth;
+            canvas.height = canvas.parentElement.clientHeight;
+        }
+        window.addEventListener('resize', resize);
+        resize();
+
+        velASlider.oninput = (e) => {
+            vA = parseInt(e.target.value);
+            valA.innerText = `${vA} m/s`;
+            updateInfo();
+        };
+
+        velBSlider.oninput = (e) => {
+            vB = parseInt(e.target.value);
+            valB.innerText = `${vB} m/s`;
+            updateInfo();
+        };
+
+        togglePlayBtn.onclick = () => {
+            isPlaying = !isPlaying;
+            if (isPlaying) {
+                playText.textContent = "ストップ";
+                playIcon.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>`;
+                lastTime = performance.now();
+            } else {
+                playText.textContent = "スタート";
+                playIcon.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>`;
+            }
+        };
+
+        resetBtn.onclick = () => {
+            resetPositions();
+        };
+
+        function resetPositions() {
+            posA = 100;
+            posB = 200;
+            if (resetTimer) {
+                clearTimeout(resetTimer);
+                resetTimer = null;
+            }
+        }
+
+        viewSelect.onchange = (e) => {
+            currentView = e.target.value;
+            resetPositions();
+            updateInfo();
+        };
+
+        function updateInfo() {
+            let formulaHtml = "";
+            let calcText = "";
+            let descText = "";
+
+            if (currentView === 'ground') {
+                formulaHtml = "地面基準：それぞれの速度";
+                calcText = `A: ${vA} m/s | B: ${vB} m/s`;
+                descText = "それぞれの車が地面に対して走っている速度です。";
+            } else if (currentView === 'carA') {
+                const relV = vB - vA;
+                formulaHtml = "Aから見たBの速度 $v_{AB} = v_B - v_A$";
+                calcText = `${vB} - (${vA}) = ${relV} m/s`;
+                descText = "車Aを静止しているとみなしたとき、車Bがどう見えるかを示しています。";
+            } else if (currentView === 'carB') {
+                const relV = vA - vB;
+                formulaHtml = "Bから見たAの速度 $v_{BA} = v_A - v_B$";
+                calcText = `${vA} - (${vB}) = ${relV} m/s`;
+                descText = "車Bを静止しているとみなしたとき、車Aがどう見えるかを示しています。";
+            }
+
+            if (formulaDisplay.innerHTML !== formulaHtml) {
+                formulaDisplay.innerHTML = formulaHtml;
+                if (window.mathjaxReady && formulaHtml.includes('$')) {
+                    MathJax.typesetPromise([formulaDisplay]);
+                }
+            }
+            calcDisplay.textContent = calcText;
+            descDisplay.textContent = descText;
+        }
+
+        // 相対速度のラベルを描画（下付き文字対応、フォントをsans-serifに統一）
+        function drawRelativeVelocityLabel(ctx, text, val, x, y, color) {
+            ctx.fillStyle = color;
+            ctx.font = "italic bold 16px sans-serif";
+            ctx.textAlign = "center";
+            
+            // vAB or vBA
+            const mainText = text.substring(0, 1); // v
+            const subText = text.substring(1);      // AB or BA
+            
+            const vWidth = ctx.measureText(mainText).width;
+            const subWidth = ctx.measureText(subText).width;
+            
+            // 重ならないように全体の幅を考慮して配置
+            // x座標の基準点を少し左にずらす
+            const startX = x - 45; 
+            
+            // 'v' の描画
+            ctx.fillText(mainText, startX, y);
+            
+            // 下付き文字 'AB' or 'BA'
+            ctx.font = "italic bold 12px sans-serif";
+            ctx.fillText(subText, startX + vWidth + 4, y + 4);
+            
+            // ' = {val} m/s'
+            ctx.font = "bold 16px sans-serif";
+            // 等号の位置を下付き文字の後に配置
+            ctx.fillText(` = ${val} m/s`, startX + vWidth + subWidth + 35, y);
+        }
+
+        function drawCar(x, y, color, label, speed, isFixed, extraInfo, infoPos, carType) {
+            ctx.save();
+            ctx.translate(x, y);
+
+            // 本体
+            ctx.fillStyle = color;
+            ctx.fillRect(-25, -15, 50, 25); 
+            
+            // 窓
+            ctx.fillStyle = "rgba(255,255,255,0.6)";
+            ctx.fillRect(5, -12, 15, 10);
+
+            // タイヤ
+            ctx.fillStyle = "#1e293b";
+            ctx.beginPath();
+            ctx.arc(-15, 10, 6, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.beginPath();
+            ctx.arc(15, 10, 6, 0, Math.PI * 2);
+            ctx.fill();
+
+            // ラベル
+            ctx.fillStyle = "#1e293b";
+            ctx.font = "bold 18px sans-serif";
+            ctx.textAlign = "center";
+            ctx.fillText(label, 0, -25);
+
+            // 追加情報の表示
+            if (extraInfo) {
+                // 車Aの場合は表示をさらに上に配置
+                let textOffset = (infoPos === 'top') ? -60 : 40;
+                
+                if (extraInfo.includes('v')) {
+                    // 相対速度表示
+                    const labelPart = extraInfo.split(' = ')[0]; // vAB or vBA
+                    const valPart = extraInfo.split(' = ')[1].replace(' m/s', '');
+                    drawRelativeVelocityLabel(ctx, labelPart, valPart, 0, textOffset, color);
+                } else {
+                    // 地面速度表示
+                    ctx.fillStyle = color;
+                    ctx.font = "bold 16px sans-serif";
+                    ctx.fillText(extraInfo, 0, textOffset);
+                }
+            }
+
+            // 速度ベクトル
+            if (!isFixed) {
+                const vectorLen = speed * 5;
+                if (Math.abs(speed) > 0.1) {
+                    ctx.strokeStyle = color;
+                    ctx.lineWidth = 3;
+                    
+                    let vectorY = 0;
+                    if (carType === 'A') {
+                        vectorY = -85; // 車Aのベクトルをさらに上に調整
+                    } else if (carType === 'B') {
+                        vectorY = 55;
+                    }
+
+                    ctx.beginPath();
+                    ctx.moveTo(0, vectorY);
+                    ctx.lineTo(vectorLen, vectorY);
+                    ctx.stroke();
+                    
+                    const headSize = 6;
+                    ctx.fillStyle = color;
+                    ctx.beginPath();
+                    ctx.moveTo(vectorLen, vectorY);
+                    ctx.lineTo(vectorLen - Math.sign(speed) * headSize, vectorY - headSize);
+                    ctx.lineTo(vectorLen - Math.sign(speed) * headSize, vectorY + headSize);
+                    ctx.closePath();
+                    ctx.fill();
+                }
+            } else {
+                ctx.strokeStyle = "#334155";
+                ctx.lineWidth = 1;
+                ctx.setLineDash([3, 3]);
+                ctx.strokeRect(-32, -38, 64, 60);
+                ctx.setLineDash([]);
+                ctx.fillStyle = "#000000";
+                ctx.font = "bold 14px sans-serif";
+                ctx.fillText("観測者", 0, 52);
+            }
+
+            ctx.restore();
+        }
+
+        function drawBackground(offset) {
+            const w = canvas.width;
+            const h = canvas.height;
+
+            // 道路
+            ctx.fillStyle = "#94a3b8";
+            ctx.fillRect(0, 100, w, 100);
+            
+            // 目盛り線
+            ctx.strokeStyle = "#cbd5e1";
+            ctx.lineWidth = 1;
+            const spacing = 10 * pixelsPerMeter;
+            const startX = (offset % spacing) - spacing;
+            
+            ctx.beginPath();
+            for (let x = startX; x < w + spacing; x += spacing) {
+                ctx.moveTo(x, 100);
+                ctx.lineTo(x, 200);
+            }
+            ctx.stroke();
+
+            // 距離テキスト
+            ctx.fillStyle = "#475569";
+            ctx.font = "12px monospace";
+            for (let x = startX; x < w + spacing; x += spacing) {
+                const meter = Math.floor((x - offset) / pixelsPerMeter);
+                ctx.fillText(`${meter}m`, x + 5, 195);
+            }
+
+            // 中央線 (流れる点線)
+            ctx.save();
+            ctx.strokeStyle = "white";
+            ctx.setLineDash([20, 20]);
+            ctx.lineDashOffset = -offset;
+            ctx.beginPath();
+            ctx.moveTo(0, 150);
+            ctx.lineTo(w, 150);
+            ctx.stroke();
+            ctx.restore();
+        }
+
+        function animate(time) {
+            const dt = isPlaying ? Math.min((time - lastTime) / 1000, 0.1) : 0; 
+            lastTime = time;
+
+            // 物理更新
+            if (isPlaying) {
+                posA += vA * dt * pixelsPerMeter;
+                posB += vB * dt * pixelsPerMeter;
+            }
+
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            let drawOffset = 0;
+            if (currentView === 'carA') {
+                drawOffset = canvas.width / 2 - posA;
+            } else if (currentView === 'carB') {
+                drawOffset = canvas.width / 2 - posB;
+            }
+
+            drawBackground(drawOffset);
+
+            const relV_AtoB = vB - vA;
+            const relV_BtoA = vA - vB;
+
+            const screenX_A = posA + drawOffset;
+            const screenX_B = posB + drawOffset;
+            const margin = 100;
+
+            // 自動リスタート判定
+            let shouldRestart = false;
+            if (currentView === 'ground') {
+                if ((screenX_A < -margin || screenX_A > canvas.width + margin) &&
+                    (screenX_B < -margin || screenX_B > canvas.width + margin)) {
+                    shouldRestart = true;
+                }
+            } else if (currentView === 'carA') {
+                if (screenX_B < -margin || screenX_B > canvas.width + margin) {
+                    shouldRestart = true;
+                }
+            } else if (currentView === 'carB') {
+                if (screenX_A < -margin || screenX_A > canvas.width + margin) {
+                    shouldRestart = true;
+                }
+            }
+
+            if (shouldRestart && isPlaying) {
+                if (!resetTimer) {
+                    resetTimer = setTimeout(() => {
+                        resetPositions();
+                    }, 1000);
+                }
+            } else {
+                if (resetTimer) {
+                    clearTimeout(resetTimer);
+                    resetTimer = null;
+                }
+            }
+
+            if (currentView === 'ground') {
+                drawCar(screenX_A, 125, "#ef4444", "車A", vA, false, `${vA} m/s`, 'top', 'A');
+                drawCar(screenX_B, 175, "#3b82f6", "車B", vB, false, `${vB} m/s`, 'bottom', 'B');
+            } else if (currentView === 'carA') {
+                drawCar(canvas.width / 2, 125, "#ef4444", "車A (自分)", 0, true, null, null, 'A');
+                drawCar(screenX_B, 175, "#3b82f6", "車B", relV_AtoB, false, `vAB = ${relV_AtoB} m/s`, 'bottom', 'B');
+            } else if (currentView === 'carB') {
+                drawCar(screenX_A, 125, "#ef4444", "車A", relV_BtoA, false, `vBA = ${relV_BtoA} m/s`, 'top', 'A');
+                drawCar(canvas.width / 2, 175, "#3b82f6", "車B (自分)", 0, true, null, null, 'B');
+            }
+
+            requestAnimationFrame(animate);
+        }
+
+        requestAnimationFrame(animate);
+        updateInfo(); // 初回実行
+    </script>
+</body>
+</html>

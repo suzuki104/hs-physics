@@ -1,0 +1,519 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>円筒面上の円運動と放物運動|高校物理アニメーション教材</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- MathJax for rendering LaTeX formulas -->
+    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <script>
+        window.MathJax = {
+            tex: {
+                inlineMath: [['$', '$'], ['\\(', '\\)']]
+            }
+        };
+    </script>
+    <style>
+        canvas {
+            background-color: #ffffff;
+            border-bottom: 2px solid #333;
+        }
+        .controls {
+            user-select: none;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen flex flex-col items-center p-4">
+    <div class="max-w-4xl w-full bg-white rounded-xl shadow-lg p-6">
+        <h1 class="text-2xl font-bold mb-4 text-gray-800 text-center">円筒面上の円運動と放物運動</h1>
+        
+        <!-- 操作コントロール（アニメーションの上に均等中央揃えで配置、スマホでも綺麗に並ぶようフレックス調整） -->
+        <div class="bg-gray-50 p-4 rounded-xl border border-gray-200 mb-4 flex flex-col sm:flex-row flex-wrap items-center justify-center gap-4 sm:gap-6 text-sm font-medium text-gray-700">
+            <!-- スタート・リセットのボタングループ (スマホでも常に横並び1行) -->
+            <div class="flex gap-2 w-full sm:w-auto justify-center">
+                <button id="btn-start" class="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-bold py-2 px-0 rounded transition w-28 sm:w-32 text-center">スタート</button>
+                <button id="btn-reset" class="bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-0 rounded transition w-28 sm:w-32 text-center">リセット</button>
+            </div>
+            
+            <!-- チェックボックスグループ (スマホでも常に横並び1行) -->
+            <div class="flex gap-4 sm:gap-6 justify-center">
+                <label class="inline-flex items-center cursor-pointer space-x-2">
+                    <input type="checkbox" id="show-vectors" checked class="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500">
+                    <span class="whitespace-nowrap">ベクトル表示</span>
+                </label>
+                
+                <label class="inline-flex items-center cursor-pointer space-x-2">
+                    <input type="checkbox" id="show-trail" checked class="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500">
+                    <span class="whitespace-nowrap">軌道を表示</span>
+                </label>
+            </div>
+            
+            <div class="flex items-center space-x-2">
+                <span class="whitespace-nowrap">再生速度:</span>
+                <select id="speed-multiplier" class="text-sm border rounded p-1 bg-white">
+                    <option value="0.1">0.1x</option>
+                    <option value="0.25">0.25x</option>
+                    <option value="0.5">0.5x</option>
+                    <option value="0.75">0.75x</option>
+                    <option value="1.0" selected>1.0x (標準)</option>
+                    <option value="1.5">1.5x</option>
+                    <option value="2.0">2.0x (高速)</option>
+                </select>
+            </div>
+        </div>
+
+        <!-- アニメーション表示 -->
+        <div class="relative mb-2">
+            <!-- w-full h-auto でアスペクト比を維持しつつ縮小投影できるようにHTMLサイズを固定 -->
+            <canvas id="canvas" width="800" height="450" class="w-full h-auto rounded-lg shadow-inner"></canvas>
+            <!-- 状態表示オーバーレイ（アニメーションの右上に配置、見出しの「状態」を削除、枠幅を固定） -->
+            <div class="absolute top-4 right-4 bg-white/90 p-2.5 rounded-lg text-sm border border-gray-200 shadow-md w-28 text-center">
+                <div id="status" class="font-bold text-blue-600">運動前</div>
+            </div>
+        </div>
+
+        <!-- 注記の配置（アニメーションのすぐ下） -->
+        <p class="text-xs text-gray-500 mb-4 text-left font-medium">※点Pは円筒面から離れた位置</p>
+
+        <!-- パラメータスライダー -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-4">
+            <div>
+                <label class="block text-sm font-medium text-gray-700">初速度 v₀ [m/s]: <span id="label-v0">1.0</span></label>
+                <input type="range" id="input-v0" min="0.1" max="10" step="0.1" value="1.0" class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer">
+                <p class="text-xs text-gray-500">※ $v_0 \ge \sqrt{gR}$ <span id="val-escape-limit" class="font-semibold text-red-600"></span> で即座に離れます</p>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700">半径 R [m]: <span id="label-r">2.0</span></label>
+                <input type="range" id="input-r" min="0.5" max="3.0" step="0.1" value="2.0" class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer">
+            </div>
+        </div>
+
+        <!-- 角度・速度・垂直抗力の測定値（半径スライダーの下に配置） -->
+        <div id="data-panel" class="bg-gray-50 p-4 rounded-xl border border-gray-200 mb-6 grid grid-cols-3 gap-4 text-center">
+            <div class="bg-white p-2 rounded shadow-sm font-mono flex flex-col justify-center items-center">
+                <div class="text-xs text-gray-500 font-semibold">角度 θ</div>
+                <div class="text-sm font-bold mt-1 text-gray-800"><span id="val-theta">0.0</span>°</div>
+            </div>
+            <div class="bg-white p-2 rounded shadow-sm font-mono flex flex-col justify-center items-center">
+                <div class="text-xs text-gray-500 font-semibold">速度 v</div>
+                <div class="text-sm font-bold mt-1 text-gray-800 whitespace-nowrap"><span id="val-v">0.00</span> m/s</div>
+            </div>
+            <div class="bg-white p-2 rounded shadow-sm font-mono flex flex-col justify-center items-center">
+                <div class="text-xs text-gray-500 font-semibold">垂直抗力 N</div>
+                <div class="text-sm font-bold mt-1 text-gray-800"><span id="val-n">0.00</span></div>
+            </div>
+        </div>
+
+        <div class="mt-6 p-4 bg-blue-50 rounded-lg border border-blue-100">
+            <ul class="text-xs text-blue-700 space-y-1 list-disc ml-4">
+                <li>円運動の向心方向 of 運動方程式: $m\frac{v^2}{R} = mg \cos\theta - N$</li>
+                <li>エネルギー保存則: $\frac{1}{2}mv_0^2 + mgR = \frac{1;}{2}mv^2 + mgR \cos\theta$</li>
+                <li>離脱の条件: 垂直抗力 $N = 0$ となるとき。</li>
+            </ul>
+        </div>
+
+        <div class="flex flex-col items-center gap-6 sm:gap-8 pt-6 sm:pt-8 border-t border-slate-100 mt-8">
+            <div class="flex gap-4 sm:gap-6 text-sm font-bold">
+                <a href="../6.0_home/home.html" class="flex items-center gap-2 px-6 sm:px-8 py-3 sm:py-4 bg-slate-800 text-white rounded-2xl hover:bg-slate-700 transition-colors">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-5 h-5">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 12l8.954-8.955c.44-.439 1.152-.439 1.591 0L21.75 12M4.5 9.75v10.125c0 .621.504 1.125 1.125 1.125H9.75v-4.875c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21h4.125c.621 0 1.125-.504 1.125-1.125V9.75M8.25 21h8.25" />
+                    </svg>
+                    ホーム
+                </a>
+                <a href="../6.1_physics_home/physics_home.html" class="flex items-center gap-2 px-6 sm:px-8 py-3 sm:py-4 bg-slate-800 text-white rounded-2xl hover:bg-slate-700 transition-colors">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-5 h-5">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
+                    </svg>
+                    物理一覧
+                </a>
+            </div>
+        </div>
+        
+        <footer class="mt-6 text-center text-gray-500 text-xs">
+            <p id="copyright"></p>
+        </footer>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        const btnStart = document.getElementById('btn-start');
+        const btnReset = document.getElementById('btn-reset');
+        const inputV0 = document.getElementById('input-v0');
+        const inputR = document.getElementById('input-r');
+        const labelV0 = document.getElementById('label-v0');
+        const labelR = document.getElementById('label-r');
+        const valTheta = document.getElementById('val-theta');
+        const valV = document.getElementById('val-v');
+        const valN = document.getElementById('val-n');
+        const statusText = document.getElementById('status');
+        const checkVectors = document.getElementById('show-vectors');
+        const checkTrail = document.getElementById('show-trail');
+        const selectSpeed = document.getElementById('speed-multiplier');
+        const copyrightEl = document.getElementById('copyright');
+        const valEscapeLimit = document.getElementById('val-escape-limit');
+
+        // コピーライトの年度自動更新
+        copyrightEl.innerHTML = `Copyright &copy; 2021-${new Date().getFullYear()} T.Suzuki`;
+
+        // 物理定数・変数 (単位: m, s)
+        let R = 2.0;
+        let v0 = 1.0;
+        const g = 9.8;
+        const ballRadius = 8;
+        let ball = {
+            x: 0,
+            y: 0,
+            v: 0,
+            vx: 0,
+            vy: 0,
+            theta: 0,
+            isCircular: true,
+            active: false,
+            trail: []
+        };
+
+        let escapePoint = null; // 離脱点の物理座標
+        let animationId;
+        const centerY = 380; 
+        
+        // シミュレーションの時間管理
+        let lastTime = 0;
+
+        function initCanvas() {
+            // スマホ表示対応：描画比率をパソコンと同じにするため、解像度は800x450で固定。CSSで伸縮させる。
+            canvas.width = 800;
+            canvas.height = 450;
+            draw();
+        }
+
+        function reset() {
+            cancelAnimationFrame(animationId);
+            R = parseFloat(inputR.value);
+            v0 = parseFloat(inputV0.value);
+            
+            ball.theta = 0;
+            ball.v = v0;
+            ball.vx = v0;
+            ball.vy = 0;
+            
+            ball.x = 0;
+            ball.y = -R;
+            
+            ball.isCircular = true;
+            ball.active = false;
+            ball.trail = [];
+            escapePoint = null;
+            lastTime = 0;
+            
+            btnStart.textContent = "スタート";
+            btnStart.disabled = false;
+            statusText.textContent = "運動前";
+            statusText.className = "text-sm font-bold text-gray-600";
+            
+            // 即座に離れる初速度限界値の計算 (√(gR))
+            const limit = Math.sqrt(g * R);
+            valEscapeLimit.textContent = `(≒ ${limit.toFixed(2)} m/s)`;
+
+            updateDisplay(0, v0, calculateN(0, v0));
+            draw();
+        }
+
+        function calculateN(theta, v) {
+            return Math.max(0, g * Math.cos(theta) - (v * v) / R);
+        }
+
+        function updateDisplay(theta, v, n) {
+            valTheta.textContent = (theta * 180 / Math.PI).toFixed(1);
+            valV.textContent = v.toFixed(2);
+            valN.textContent = n.toFixed(2);
+        }
+
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            const ox = canvas.width / 3;
+            const oy = centerY;
+            const R_draw = R * 100; // 物理半径に100倍を乗じて見やすい描画サイズに変換
+            
+            // スマホ判定（ウィンドウ幅やCanvasの表示サイズから検知してスケールを大きくする）
+            const isMobile = canvas.clientWidth < 500;
+            const labelFont = isMobile ? "bold 32px sans-serif" : "bold 14px sans-serif";
+            const offsetO = isMobile ? 50 : 25;
+            const offsetP_x = isMobile ? 20 : 8;
+            const offsetP_y = isMobile ? 20 : 8;
+            const dotRadius = isMobile ? 12 : 5;
+
+            // 地面
+            ctx.beginPath();
+            ctx.moveTo(0, oy);
+            ctx.lineTo(canvas.width, oy);
+            ctx.strokeStyle = '#333';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+
+            // 内部の塗りつぶし（円筒面と水平面の下）
+            ctx.fillStyle = '#f3f4f6';
+            ctx.beginPath();
+            ctx.moveTo(ox, oy);
+            ctx.arc(ox, oy, R_draw, -Math.PI/2, 0);
+            ctx.closePath();
+            ctx.fill();
+            ctx.fillRect(0, oy - R_draw, ox, R_draw);
+
+            // 円筒面（太さを1.5に細く変更）
+            ctx.beginPath();
+            ctx.arc(ox, oy, R_draw, -Math.PI/2, 0);
+            ctx.strokeStyle = '#000';
+            ctx.lineWidth = 1.5;
+            ctx.stroke();
+
+            // 左側の水平面（太さを1.5に細く変更）
+            ctx.beginPath();
+            ctx.moveTo(0, oy - R_draw);
+            ctx.lineTo(ox, oy - R_draw);
+            ctx.strokeStyle = '#000';
+            ctx.lineWidth = 1.5;
+            ctx.stroke();
+
+            // 中心点 O
+            ctx.fillStyle = '#000';
+            ctx.beginPath();
+            ctx.arc(ox, oy, isMobile ? 6 : 4, 0, Math.PI*2);
+            ctx.fill();
+            ctx.font = labelFont;
+            ctx.fillText("O", ox - (isMobile ? 8 : 5), oy + offsetO);
+
+            // 軌道の描画（点線、物理単位に100倍を乗じてピクセル化）
+            if (checkTrail.checked && ball.trail.length > 1) {
+                ctx.beginPath();
+                ctx.setLineDash([4, 4]);
+                ctx.moveTo(ox + ball.trail[0].x * 100, oy + ball.trail[0].y * 100);
+                for (let i = 1; i < ball.trail.length; i++) {
+                    ctx.lineTo(ox + ball.trail[i].x * 100, oy + ball.trail[i].y * 100);
+                }
+                ctx.strokeStyle = '#ef4444'; // 軌道の点線の色を青から「赤」に変更
+                ctx.lineWidth = 2.5; // 軌道を太くして見やすく調整
+                ctx.stroke();
+                ctx.setLineDash([]);
+            }
+
+            // 面から離れた位置（離脱点）に⚫︎を描画
+            if (escapePoint) {
+                ctx.beginPath();
+                ctx.arc(ox + escapePoint.x * 100, oy + escapePoint.y * 100, dotRadius, 0, Math.PI * 2);
+                ctx.fillStyle = '#000000';
+                ctx.fill();
+                ctx.font = labelFont;
+                ctx.fillText("P", ox + escapePoint.x * 100 + offsetP_x, oy + escapePoint.y * 100 - offsetP_y);
+            }
+
+            // 小球の描画位置
+            let ballDrawX, ballDrawY;
+            if (ball.isCircular) {
+                const drawR = R_draw + ballRadius; 
+                ballDrawX = ox + drawR * Math.sin(ball.theta);
+                ballDrawY = oy - drawR * Math.cos(ball.theta);
+            } else {
+                const angle = Math.atan2(ball.vy, ball.vx);
+                const offsetX = -Math.sin(angle) * ballRadius;
+                const offsetY = Math.cos(angle) * ballRadius;
+                ballDrawX = ox + ball.x * 100 - offsetX;
+                ballDrawY = oy + ball.y * 100 - offsetY;
+            }
+
+            ctx.beginPath();
+            ctx.arc(ballDrawX, ballDrawY, ballRadius, 0, Math.PI*2);
+            ctx.fillStyle = '#3b82f6';
+            ctx.fill();
+            ctx.strokeStyle = '#1d4ed8';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+
+            if (ball.isCircular) {
+                ctx.beginPath();
+                ctx.moveTo(ox, oy);
+                ctx.lineTo(ballDrawX, ballDrawY);
+                ctx.strokeStyle = '#999';
+                ctx.setLineDash([2, 2]);
+                ctx.stroke();
+                ctx.setLineDash([]);
+            }
+
+            // ベクトル表示
+            if (checkVectors.checked && (ball.active || ball.v > 0)) {
+                const vecScale = 15;
+                const vAngle = ball.isCircular ? ball.theta : Math.atan2(ball.vy, ball.vx);
+                const vx = Math.cos(vAngle) * ball.v * vecScale;
+                const vy = Math.sin(vAngle) * ball.v * vecScale;
+                
+                // 中心 O から物体を結ぶ単位方向ベクトルを計算し、常にその「外側（遠い側）」に速度ベクトルを配置
+                const dx = ballDrawX - ox;
+                const dy = ballDrawY - oy;
+                const dist = Math.sqrt(dx * dx + dy * dy);
+                const ux = dx / dist;
+                const uy = dy / dist;
+                const vOffset = isMobile ? 24 : 12; // 物体の外周から速度ベクトルまでの隙間をスマホ時は少し広げる
+                const vPosX = ballDrawX + ux * vOffset;
+                const vPosY = ballDrawY + uy * vOffset;
+                
+                drawArrow(vPosX, vPosY, vPosX + vx, vPosY + vy, '#10b981', 'v');
+                
+                // 重力と垂直抗力は物体の描画中心から
+                drawArrow(ballDrawX, ballDrawY, ballDrawX, ballDrawY + g * 5, '#ef4444', 'mg');
+                if (ball.isCircular) {
+                    const N = calculateN(ball.theta, ball.v);
+                    if (N > 0) {
+                        const nx = -Math.sin(ball.theta) * N * 10;
+                        const ny = Math.cos(ball.theta) * N * 10;
+                        drawArrow(ballDrawX, ballDrawY, ballDrawX - nx, ballDrawY - ny, '#8b5cf6', 'N');
+                    }
+                }
+            }
+        }
+
+        function drawArrow(fromx, fromy, tox, toy, color, label) {
+            // スマホ表示判定に基づいて太さと文字サイズをスケール
+            const isMobile = canvas.clientWidth < 500;
+            const headlen = isMobile ? 20 : 8;
+            const arrowLineWidth = isMobile ? 9 : 2;
+            const labelFontSize = isMobile ? "italic 30px serif" : "italic 12px serif";
+
+            const dx = tox - fromx;
+            const dy = toy - fromy;
+            const angle = Math.atan2(dy, dx);
+            ctx.strokeStyle = color;
+            ctx.fillStyle = color;
+            ctx.lineWidth = arrowLineWidth;
+            ctx.beginPath();
+            ctx.moveTo(fromx, fromy);
+            ctx.lineTo(tox, toy);
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.moveTo(tox, toy);
+            ctx.lineTo(tox - headlen * Math.cos(angle - Math.PI / 6), toy - headlen * Math.sin(angle - Math.PI / 6));
+            ctx.lineTo(tox - headlen * Math.cos(angle + Math.PI / 6), toy - headlen * Math.sin(angle + Math.PI / 6));
+            ctx.closePath();
+            ctx.fill();
+            if (label) {
+                ctx.font = labelFontSize;
+                
+                // 文字が画面（Canvas）からはみ出て見切れないように座標を自動補正
+                let labelX = tox + (isMobile ? 12 : 5);
+                let labelY = toy + (isMobile ? 12 : 5);
+                
+                const textWidth = ctx.measureText(label).width;
+                const margin = isMobile ? 35 : 15;
+                
+                if (labelX < margin) labelX = margin;
+                if (labelX + textWidth > canvas.width - margin) labelX = canvas.width - textWidth - margin;
+                if (labelY < margin) labelY = margin;
+                if (labelY > canvas.height - margin) labelY = canvas.height - margin;
+                
+                ctx.fillText(label, labelX, labelY);
+            }
+        }
+
+        function update(timestamp) {
+            if (!ball.active) return;
+            if (!lastTime) lastTime = timestamp;
+            
+            let dt = (timestamp - lastTime) / 1000;
+            lastTime = timestamp;
+
+            dt *= parseFloat(selectSpeed.value);
+
+            const substeps = 4;
+            const subDt = dt / substeps;
+
+            for (let i = 0; i < substeps; i++) {
+                if (ball.isCircular) {
+                    const N = calculateN(ball.theta, ball.v);
+                    
+                    if (N <= 0 || ball.theta >= Math.PI / 2) {
+                        ball.isCircular = false;
+                        ball.x = R * Math.sin(ball.theta);
+                        ball.y = -R * Math.cos(ball.theta);
+                        ball.vx = ball.v * Math.cos(ball.theta);
+                        ball.vy = ball.v * Math.sin(ball.theta);
+                        
+                        // 理想軌道の離脱点の物理位置を保存
+                        escapePoint = { x: ball.x, y: ball.y };
+                        
+                        statusText.textContent = "放物運動中";
+                        statusText.className = "text-sm font-bold text-red-600";
+                    } else {
+                        const alpha = (g / R) * Math.sin(ball.theta);
+                        const omega = ball.v / R;
+                        ball.theta += omega * subDt + 0.5 * alpha * subDt * subDt;
+                        ball.v = Math.sqrt(v0 * v0 + 2 * g * R * (1 - Math.cos(ball.theta)));
+                        
+                        ball.x = R * Math.sin(ball.theta);
+                        ball.y = -R * Math.cos(ball.theta);
+                        
+                        statusText.textContent = "円運動中";
+                        statusText.className = "text-sm font-bold text-blue-600";
+                    }
+                } else {
+                    ball.vy += g * subDt;
+                    ball.x += ball.vx * subDt;
+                    ball.y += ball.vy * subDt;
+                    ball.v = Math.sqrt(ball.vx**2 + ball.vy**2);
+                    
+                    if (ball.y >= 0) { // 地面は y = 0
+                        ball.y = 0;
+                        ball.active = false;
+                        statusText.textContent = "着地";
+                        statusText.className = "text-sm font-bold text-green-600";
+                        btnStart.textContent = "終了";
+                        btnStart.disabled = true;
+                        break;
+                    }
+                }
+                if (i % 2 === 0) {
+                    ball.trail.push({x: ball.x, y: ball.y});
+                }
+            }
+
+            const currentN = ball.isCircular ? calculateN(ball.theta, ball.v) : 0;
+            updateDisplay(ball.theta, ball.v, currentN);
+            draw();
+
+            if (ball.active) {
+                animationId = requestAnimationFrame(update);
+            }
+        }
+
+        btnStart.addEventListener('click', () => {
+            if (ball.active) {
+                ball.active = false;
+                btnStart.textContent = "再開";
+            } else {
+                if (!ball.isCircular && ball.y >= 0) reset(); 
+                ball.active = true;
+                lastTime = 0; 
+                btnStart.textContent = "一時停止";
+                animationId = requestAnimationFrame(update);
+            }
+        });
+
+        btnReset.addEventListener('click', reset);
+
+        inputV0.addEventListener('input', () => {
+            labelV0.textContent = inputV0.value;
+            reset();
+        });
+
+        inputR.addEventListener('input', () => {
+            labelR.textContent = parseFloat(inputR.value).toFixed(1); // 小数点第一位までに変更
+            reset();
+        });
+
+        window.addEventListener('resize', initCanvas);
+        window.onload = initCanvas;
+        reset();
+
+    </script>
+</body>
+</html>
